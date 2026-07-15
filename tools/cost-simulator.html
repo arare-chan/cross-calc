@@ -140,16 +140,16 @@
     border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--ink);
   }
   .total { margin: 4px 0 10px; }
-  .total .num { font-size: 26px; font-weight: 700; letter-spacing: .02em; }
-  .total .unit { font-size: 13px; color: var(--sub); margin-left: 2px; }
+  /* 合計(金利・貸株料・管理費など全部足した総額)= 一番見たい数字なので青く大きく強調 */
+  .total .num { font-size: 32px; font-weight: 800; letter-spacing: .02em; color: var(--accent); }
+  .total .unit { font-size: 13px; color: var(--accent); margin-left: 2px; }
   table.breakdown { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: auto; }
   table.breakdown td { padding: 4px 0; border-top: 1px dashed var(--line); vertical-align: top; }
   table.breakdown td.amt { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
   table.breakdown .formula { display: block; font-size: 10.5px; color: var(--sub); }
   table.breakdown tr.zero td { color: var(--zero); }
-  /* 内訳の強調: 事務管理費=赤・手数料=青(額が発生した行だけ。0円行は上のグレー) */
+  /* 内訳の強調: 事務管理費=赤(額が発生した行だけ。0円行は上のグレー)。青は合計の総額に使う */
   table.breakdown tr.fee-admin td { color: var(--danger); font-weight: 600; }
-  table.breakdown tr.fee-comm td { color: var(--accent); }
   .warnbox { margin-top: 8px; font-size: 11.5px; color: var(--warn); background: var(--warn-bg); border-radius: 7px; padding: 6px 9px; }
   .warnbox div + div { margin-top: 3px; }
 
@@ -214,7 +214,7 @@
   .dlg-foot .spacer { flex: 1; }
 
   @media (max-width: 640px) {
-    .total .num { font-size: 22px; }
+    .total .num { font-size: 27px; }
     /* スマホでの使いやすさ: iOS はフォーム部品が16px未満だとフォーカス時に画面が自動ズームされるため16pxに */
     .field input, .field select, .card .opts select, .card .opts input,
     .set-field input, .set-field select, .set-field textarea { font-size: 16px; }
@@ -239,7 +239,7 @@
       <span><span class="chip manual">手入力</span>自動では入らない欄 — 自分で入力する</span>
       <span><span class="chip auto">自動</span>銘柄コードを入れると自動で入る(手直しも可)</span>
       <span>無印: 初期値が自動で入る(ボタンで変更可)</span>
-      <span>内訳の色: <b class="adm">赤=事務管理費</b>・<b class="com">青=手数料</b>(かかる時だけ色付き・0円はグレー)</span>
+      <span>色の意味: <b class="com">青=合計</b>(一番見たい総額)・内訳の<b class="adm">赤=事務管理費</b>(かかる時だけ・0円はグレー)</span>
     </div>
     <div class="grid">
       <div class="field">
@@ -892,10 +892,9 @@ function renderCards() {
     if (!r) {
       body = '<div class="total"><span class="num" style="color:var(--zero)">—</span></div><div style="font-size:12px;color:var(--sub)">株価・株数・日付を入力してください</div>';
     } else {
-      // 内訳の色分け: 0円はグレー、事務管理費は赤、手数料は青(額が発生した行だけ)
+      // 内訳の色分け: 0円はグレー、事務管理費は赤(額が発生した行だけ)。青は下の合計に使う
       const rowClass = it => it.amount === 0 ? 'zero'
-        : it.label.startsWith('事務管理費') ? 'fee-admin'
-        : it.label.includes('手数料') ? 'fee-comm' : '';
+        : it.label.startsWith('事務管理費') ? 'fee-admin' : '';
       const rows = r.items.map(it => `
         <tr class="${rowClass(it)}">
           <td>${esc(it.label)}${it.formula ? `<span class="formula">${esc(it.formula)}</span>` : ''}</td>
