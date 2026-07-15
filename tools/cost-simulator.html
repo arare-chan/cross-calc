@@ -84,6 +84,19 @@
   .field input:focus, .field select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   .field .after { font-size: 12px; color: var(--sub); margin-top: 3px; }
 
+  /* 入力欄の色分け: 黄 = 自動では入らない(手入力) / 緑チップ = コード入力で自動反映 */
+  .chip {
+    display: inline-block; font-size: 10px; font-weight: 600; line-height: 1.7;
+    border-radius: 999px; padding: 0 7px; margin-left: 6px; vertical-align: 1px;
+  }
+  .chip.manual { color: var(--warn); background: var(--warn-bg); border: 1px solid var(--warn); }
+  .chip.auto { color: var(--good); background: var(--good-bg); border: 1px solid var(--good); }
+  .field input.manual, .card .opts input.manual { background: var(--warn-bg); border-color: var(--warn); }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 11px; color: var(--sub); margin: -4px 0 12px; }
+  .legend .chip { margin-left: 0; margin-right: 4px; }
+  .legend b.adm { color: var(--danger); }
+  .legend b.com { color: var(--accent); }
+
   .quicklinks { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
   .quicklinks a {
     font-size: 12px; color: var(--accent); text-decoration: none;
@@ -134,6 +147,9 @@
   table.breakdown td.amt { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
   table.breakdown .formula { display: block; font-size: 10.5px; color: var(--sub); }
   table.breakdown tr.zero td { color: var(--zero); }
+  /* 内訳の強調: 事務管理費=赤・手数料=青(額が発生した行だけ。0円行は上のグレー) */
+  table.breakdown tr.fee-admin td { color: var(--danger); font-weight: 600; }
+  table.breakdown tr.fee-comm td { color: var(--accent); }
   .warnbox { margin-top: 8px; font-size: 11.5px; color: var(--warn); background: var(--warn-bg); border-radius: 7px; padding: 6px 9px; }
   .warnbox div + div { margin-top: 3px; }
 
@@ -219,10 +235,16 @@
   <section class="panel">
     <h2 style="display:flex; align-items:center; justify-content:space-between;">取引条件
       <button class="small" id="btnClearInput" type="button">入力をクリア</button></h2>
+    <div class="legend">
+      <span><span class="chip manual">手入力</span>自動では入らない欄 — 自分で入力する</span>
+      <span><span class="chip auto">自動</span>銘柄コードを入れると自動で入る(手直しも可)</span>
+      <span>無印: 初期値が自動で入る(ボタンで変更可)</span>
+      <span>内訳の色: <b class="adm">赤=事務管理費</b>・<b class="com">青=手数料</b>(かかる時だけ色付き・0円はグレー)</span>
+    </div>
     <div class="grid">
       <div class="field">
-        <label for="inCode">銘柄コード</label>
-        <input id="inCode" type="text" inputmode="numeric" placeholder="例: 9861" maxlength="5">
+        <label for="inCode">銘柄コード<span class="chip manual">手入力</span></label>
+        <input id="inCode" type="text" inputmode="numeric" class="manual" placeholder="例: 9861" maxlength="5">
         <div class="quicklinks">
           <a id="lnkYahoo" href="#" target="_blank" rel="noopener" class="disabled">Yahoo!株価</a>
           <a id="lnkYahooYutai" href="#" target="_blank" rel="noopener" class="disabled">Yahoo!優待</a>
@@ -231,12 +253,12 @@
         </div>
       </div>
       <div class="field">
-        <label for="inName">銘柄名(名前からの検索もここ)</label>
+        <label for="inName">銘柄名(名前からの検索もここ)<span class="chip auto">自動</span></label>
         <input id="inName" type="text" placeholder="例: 吉野家(2文字で候補表示)" list="stockNameList">
         <datalist id="stockNameList"></datalist>
       </div>
       <div class="field">
-        <label for="inPrice">株価(円)</label>
+        <label for="inPrice">株価(円)<span class="chip auto" id="chipPrice">自動</span></label>
         <input id="inPrice" type="number" min="1" step="0.5" placeholder="例: 3200">
         <div class="after">
           <button class="small" id="btnFetchPrice" type="button">⚡ 再取得</button>
@@ -244,8 +266,8 @@
         </div>
       </div>
       <div class="field">
-        <label for="inShares">株数</label>
-        <input id="inShares" type="number" min="1" step="100" placeholder="例: 100">
+        <label for="inShares">株数<span class="chip manual">手入力</span></label>
+        <input id="inShares" type="number" min="1" step="100" class="manual" placeholder="例: 100">
         <div class="after">約定代金: <b id="outAmount">—</b></div>
       </div>
       <div class="field">
@@ -344,6 +366,7 @@ const DEFAULT_CONFIG = {
       '2026/01/05 日興: 一般(3年)貸株料 1.40%→1.70%、制度買方金利 2.50%→2.97%'
     ],
     tool: [
+      '2026/07/16 入力欄を色分け(黄=手入力が必要/緑=コード入力で自動反映)し凡例を追加/内訳の事務管理費を赤・手数料を青で強調(かかる時だけ。0円はグレーのまま)/日程パネルの事務管理費境界を赤表示',
       '2026/07/15 スマホ対応の調整(iOSで入力時に画面が自動ズームされる問題の対策ほか)。Windows・スマホからは Artifact リンクをブラウザで開けばそのまま使える',
       '2026/07/15 制度信用売り選択時に逆日歩の最悪ケース額を自動計算(日証金の最高料率算定式×権利付最終日4倍×品貸日数。規則原文で式を確認)',
       '2026/07/15 プレミアム料・HYPER料を打ったそばから即反映するよう修正(「欄の外をクリックするまで反映されない」問題の解消)/銘柄名からの逆引き検索を追加(2文字で候補→選ぶとコード・株価まで自動)',
@@ -858,19 +881,23 @@ function renderCards() {
 
     const extraInput =
       key === 'esmart' ? `
-        <div><label>プレミアム料(円/株/日)— ログイン後「売建可能銘柄一覧」の値を手入力(自動取得不可)</label>
-        <input type="text" inputmode="decimal" data-extra="premiumPerShare" value="${esc(inputState.premiumPerShare || 0)}"></div>`
+        <div><label>プレミアム料(円/株/日)<span class="chip manual">手入力</span>— ログイン後「売建可能銘柄一覧」の値(自動取得不可)</label>
+        <input type="text" inputmode="decimal" class="manual" data-extra="premiumPerShare" value="${esc(inputState.premiumPerShare || 0)}"></div>`
       : (key === 'sbi' && inputState.sellType.sbi === 'hyper') ? `
-        <div><label>HYPER料(円/株/日)</label>
-        <input type="text" inputmode="decimal" data-extra="hyperPerShare" value="${esc(inputState.hyperPerShare || 0)}"></div>`
+        <div><label>HYPER料(円/株/日)<span class="chip manual">手入力</span>— HYPER空売り銘柄一覧の値</label>
+        <input type="text" inputmode="decimal" class="manual" data-extra="hyperPerShare" value="${esc(inputState.hyperPerShare || 0)}"></div>`
       : '';
 
     let body;
     if (!r) {
       body = '<div class="total"><span class="num" style="color:var(--zero)">—</span></div><div style="font-size:12px;color:var(--sub)">株価・株数・日付を入力してください</div>';
     } else {
+      // 内訳の色分け: 0円はグレー、事務管理費は赤、手数料は青(額が発生した行だけ)
+      const rowClass = it => it.amount === 0 ? 'zero'
+        : it.label.startsWith('事務管理費') ? 'fee-admin'
+        : it.label.includes('手数料') ? 'fee-comm' : '';
       const rows = r.items.map(it => `
-        <tr class="${it.amount === 0 ? 'zero' : ''}">
+        <tr class="${rowClass(it)}">
           <td>${esc(it.label)}${it.formula ? `<span class="formula">${esc(it.formula)}</span>` : ''}</td>
           <td class="amt">${fmtYen(it.amount)}円</td>
         </tr>`).join('');
@@ -979,7 +1006,7 @@ function renderPreview() {
     const hLast = prevBizDay(o, set);
     items.push({ label: '品貸日数(制度売りの逆日歩日数・権利付最終日1泊)', value: calDays(addBizDays(hLast, 2, set), addBizDays(o, 2, set)) + '日' });
     const bnd = addMonthsClamped(o, -1);
-    items.push({ label: '事務管理費(楽天/SBI/イースマ・月110円〜)', value: fmtJP(bnd) + ' 以前の建てで発生' });
+    items.push({ label: '事務管理費(楽天/SBI/イースマ・月110円〜)', value: fmtJP(bnd) + ' 以前の建てで発生', hot: true });
   }
   const html =
     errs.map(e => '<span class="err">⚠ ' + esc(e) + '</span>').join('') +
@@ -1364,7 +1391,13 @@ function init() {
   document.getElementById('btnKenri20').addEventListener('click', () => { const s = nextKenriSchedule(20); if (s) applyKenriSchedule(s); });
   document.getElementById('btnFetchPrice').addEventListener('click', fetchPrice);
   document.getElementById('priceStatus').textContent = inputState.priceNote || PRICE_STATUS_DEFAULT;
-  if (ARTIFACT_BUILD) document.getElementById('btnFetchPrice').style.display = 'none'; // 配布版は外部取得不可
+  if (ARTIFACT_BUILD) { // 配布版は外部取得不可 → 株価も「手入力」扱いの表示にする
+    document.getElementById('btnFetchPrice').style.display = 'none';
+    const chip = document.getElementById('chipPrice');
+    chip.textContent = '手入力';
+    chip.className = 'chip manual';
+    document.getElementById('inPrice').classList.add('manual');
+  }
 
   // confirm/alert はこの配布環境(claude.ai)でブロックされるため使わず、「2回押し」で誤操作を防ぐ
   armTwice(document.getElementById('btnClearInput'), 'もう一度押すとクリア', () => {
