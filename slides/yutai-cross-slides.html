@@ -1,0 +1,868 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>優待クロスのトリセツ — スライド版</title>
+<style>
+:root{
+  --paper:#ffffff;
+  --panel:#f2f5f9;
+  --ink:#182338;
+  --muted:#5c6a80;
+  --line:#d7dfe9;
+  --buy:#d9364a;
+  --buy-bg:#fdeef0;
+  --sell:#2e6fb7;
+  --sell-bg:#eaf2fb;
+  --gain:#0e8a5f;
+  --gain-bg:#e8f5ef;
+  --warn:#b95c00;
+  --warn-bg:#fdf3e6;
+  --hud-h:56px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",system-ui,sans-serif;
+  background:var(--panel);
+  color:var(--ink);
+  font-size:clamp(15px,1.6vw,19px);
+  line-height:1.7;
+}
+#deck{height:calc(100dvh - var(--hud-h));position:relative}
+.slide{
+  display:none;
+  height:100%;
+  overflow-y:auto;
+  background:var(--paper);
+}
+.slide.active{display:block}
+@media (prefers-reduced-motion: no-preference){
+  .slide.active{animation:fadein .25s ease}
+  @keyframes fadein{from{opacity:0}to{opacity:1}}
+}
+.inner{
+  max-width:1080px;
+  margin:0 auto;
+  padding:clamp(20px,4.5vh,48px) clamp(20px,5vw,56px) clamp(28px,5vh,56px);
+  display:flex;flex-direction:column;gap:clamp(14px,2.4vh,26px);
+  min-height:100%;
+}
+.eyebrow{
+  font-size:.72em;font-weight:700;letter-spacing:.14em;color:var(--muted);
+  text-transform:uppercase;
+}
+.eyebrow .no{display:inline-block;background:var(--ink);color:#fff;border-radius:4px;padding:0 .55em;margin-right:.7em;letter-spacing:0}
+h1{font-size:clamp(34px,6.2vw,64px);font-weight:800;line-height:1.25;text-wrap:balance}
+h2{font-size:clamp(24px,4.2vw,42px);font-weight:800;line-height:1.3;text-wrap:balance}
+.lead{font-size:1.06em;max-width:34em}
+.note{font-size:.82em;color:var(--muted)}
+strong{font-weight:800}
+.buy-t{color:var(--buy);font-weight:800}
+.sell-t{color:var(--sell);font-weight:800}
+.gain-t{color:var(--gain);font-weight:800}
+.warn-t{color:var(--warn);font-weight:800}
+.num{font-variant-numeric:tabular-nums}
+
+/* 汎用パネル */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:1em 1.2em}
+.callout{border-left:6px solid var(--gain);background:var(--gain-bg);border-radius:0 10px 10px 0;padding:.9em 1.1em}
+.callout.warn{border-color:var(--warn);background:var(--warn-bg)}
+.callout.danger{border-color:var(--buy);background:var(--buy-bg)}
+
+/* チップ */
+.chip{display:inline-block;border-radius:999px;padding:.1em .8em;font-weight:800;font-size:.85em;color:#fff}
+.chip.buy{background:var(--buy)}
+.chip.sell{background:var(--sell)}
+.chip.gain{background:var(--gain)}
+.chip.warn{background:var(--warn)}
+.chip.ghost{background:#fff;color:var(--ink);border:1.5px solid var(--line)}
+
+/* 表紙 */
+.cover .inner{justify-content:center;gap:26px}
+.cover-badges{display:flex;gap:10px;flex-wrap:wrap}
+.hint{display:flex;gap:1.4em;flex-wrap:wrap;font-size:.9em;color:var(--muted)}
+.hint b{color:var(--ink)}
+
+/* もくじ */
+.toc{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.toc-group{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:1em 1.1em}
+.toc-group h3{font-size:.8em;letter-spacing:.1em;color:var(--muted);margin-bottom:.6em}
+.toc button{
+  display:block;width:100%;text-align:left;background:none;border:none;cursor:pointer;
+  font:inherit;color:var(--ink);padding:.28em .2em;border-radius:6px;font-weight:600;
+}
+.toc button:hover,.toc button:focus-visible{background:#fff;outline:2px solid var(--sell)}
+.toc button .pg{color:var(--muted);font-weight:400;font-size:.85em}
+
+/* シーソー */
+.seesaw{display:flex;flex-direction:column;align-items:center;gap:0;padding:1.2em 0 0}
+.seesaw .plank{
+  width:min(560px,88%);display:flex;justify-content:space-between;align-items:flex-end;
+  border-bottom:10px solid var(--ink);border-radius:3px;padding:0 8px 10px;
+}
+.seesaw .box{border-radius:10px;padding:.55em 1em;font-weight:800;color:#fff;text-align:center;line-height:1.4}
+.seesaw .box small{display:block;font-weight:600;font-size:.72em;opacity:.9}
+.seesaw .box.b{background:var(--buy)}
+.seesaw .box.s{background:var(--sell)}
+.seesaw .pivot{width:0;height:0;border-left:26px solid transparent;border-right:26px solid transparent;border-bottom:34px solid var(--ink)}
+.seesaw .caption{margin-top:.9em;font-weight:800;font-size:1.05em}
+
+/* 3つの日カレンダー */
+.days{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.day{border:2px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;text-align:center}
+.day .d-head{font-weight:800;color:#fff;padding:.35em;font-size:.9em}
+.day .d-num{font-size:clamp(30px,4.5vw,46px);font-weight:800;padding:.15em 0}
+.day .d-desc{font-size:.8em;padding:0 .7em .8em;color:var(--muted)}
+.day.k1 .d-head{background:var(--gain)}
+.day.k2 .d-head{background:var(--sell)}
+.day.k3 .d-head{background:var(--muted)}
+.day.k1{border-color:var(--gain)}
+.days-arrow{text-align:center;font-weight:800;color:var(--muted);font-size:.9em}
+
+/* ステップ */
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.step{background:#fff;border:2px solid var(--line);border-radius:12px;padding:.9em 1em;position:relative}
+.step .s-no{position:absolute;top:-14px;left:12px;background:var(--ink);color:#fff;border-radius:999px;width:28px;height:28px;display:grid;place-items:center;font-weight:800;font-size:.85em}
+.step h3{font-size:1em;font-weight:800;margin:.35em 0 .3em}
+.step p{font-size:.85em;color:var(--muted)}
+.step .when{font-size:.75em;font-weight:800;color:var(--sell)}
+
+/* フロー(手法) */
+.flow{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap}
+.flow .f-box{flex:1 1 150px;border-radius:12px;padding:.8em .9em;text-align:center;font-weight:800;background:#fff;border:2px solid var(--line);display:flex;flex-direction:column;justify-content:center;gap:.2em}
+.flow .f-box small{font-weight:600;font-size:.72em;color:var(--muted)}
+.flow .f-box.b{border-color:var(--buy);background:var(--buy-bg)}
+.flow .f-box.s{border-color:var(--sell);background:var(--sell-bg)}
+.flow .f-box.g{border-color:var(--gain);background:var(--gain-bg)}
+.flow .f-arrow{align-self:center;font-weight:800;color:var(--muted);font-size:1.3em}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:640px){.pair{grid-template-columns:1fr}}
+
+/* 式 */
+.formula{
+  background:var(--ink);color:#fff;border-radius:12px;padding:1em 1.2em;
+  font-weight:800;font-size:clamp(16px,2.6vw,24px);text-align:center;line-height:1.9;
+}
+.formula .hl{color:#ffd76a}
+
+/* 4社カード */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.card{border:2px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+.card .c-head{padding:.5em .9em;color:#fff;font-weight:800;display:flex;justify-content:space-between;align-items:center}
+.card .c-head small{font-weight:600;font-size:.72em;opacity:.9}
+.card ul{list-style:none;padding:.7em .9em;font-size:.83em;display:flex;flex-direction:column;gap:.45em}
+.card li b{font-weight:800}
+.card .tag{font-size:.78em;font-weight:800;padding:0 .5em;border-radius:4px}
+
+/* タイムライン */
+.timeline{display:flex;flex-direction:column;gap:0;max-width:640px}
+.t-row{display:grid;grid-template-columns:92px 18px 1fr;gap:10px;align-items:start}
+.t-time{font-weight:800;font-variant-numeric:tabular-nums;text-align:right;font-size:1em;padding-top:.05em}
+.t-dotcol{display:flex;flex-direction:column;align-items:center;align-self:stretch}
+.t-dot{width:14px;height:14px;border-radius:50%;background:var(--sell);flex:none;margin-top:.4em}
+.t-line{width:3px;flex:1;background:var(--line)}
+.t-body{padding-bottom:1.1em}
+.t-body b{font-weight:800}
+.t-body .co{font-size:.8em;color:var(--muted)}
+.t-row.hot .t-dot{background:var(--buy)}
+
+/* 対比2枚 */
+.vs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:640px){.vs{grid-template-columns:1fr}}
+.vs .v-box{border-radius:12px;padding:1em 1.1em;border:2px solid var(--line);background:#fff}
+.vs .v-box h3{font-size:1.02em;font-weight:800;margin-bottom:.4em}
+.vs .v-box.ok{border-color:var(--gain);background:var(--gain-bg)}
+.vs .v-box.ng{border-color:var(--buy);background:var(--buy-bg)}
+.vs .v-box p{font-size:.88em}
+.big-emoji{font-size:clamp(30px,4.5vw,44px);line-height:1}
+
+/* 失敗図鑑 */
+.fail{border:2px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+.fail .f-head{display:flex;justify-content:space-between;align-items:center;gap:1em;background:var(--ink);color:#fff;padding:.5em 1em;font-weight:800}
+.fail .f-head .sev{color:#ffd76a;letter-spacing:.1em;font-size:.85em}
+.fail .f-body{display:grid;grid-template-columns:1fr 1.4fr;gap:0}
+@media(max-width:640px){.fail .f-body{grid-template-columns:1fr}}
+.fail .f-sym{padding:.9em 1em;font-size:.88em;background:var(--buy-bg)}
+.fail .f-fix{padding:.9em 1em;font-size:.88em;background:var(--gain-bg)}
+.fail .f-sym h4,.fail .f-fix h4{font-size:.8em;letter-spacing:.08em;margin-bottom:.35em}
+.fail .f-sym h4{color:var(--buy)}
+.fail .f-fix h4{color:var(--gain)}
+.fail ol{padding-left:1.3em;display:flex;flex-direction:column;gap:.25em}
+.fails{display:flex;flex-direction:column;gap:14px}
+
+/* 合言葉 */
+.mantra{display:grid;gap:12px;max-width:720px}
+.mantra .m-row{display:grid;grid-template-columns:52px 1fr;gap:14px;align-items:center;background:#fff;border:2px solid var(--line);border-radius:12px;padding:.8em 1em}
+.mantra .m-no{width:44px;height:44px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font-weight:800;font-size:1.2em}
+.mantra .m-row b{font-size:1.05em}
+.mantra .m-row p{font-size:.85em;color:var(--muted)}
+
+/* チェックリスト */
+.checks{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:900px}
+@media(max-width:700px){.checks{grid-template-columns:1fr}}
+.check{display:flex;gap:.7em;align-items:flex-start;background:#fff;border:1.5px solid var(--line);border-radius:10px;padding:.7em .9em;font-size:.9em}
+.check .cb{flex:none;width:1.35em;height:1.35em;border:2.5px solid var(--gain);border-radius:5px;margin-top:.1em}
+
+/* HUD */
+#hud{
+  position:fixed;left:0;right:0;bottom:0;height:var(--hud-h);
+  background:var(--ink);color:#fff;display:flex;align-items:center;gap:14px;
+  padding:0 14px;z-index:10;
+}
+#bar{flex:1;height:6px;background:#3a4a66;border-radius:3px;overflow:hidden}
+#bar i{display:block;height:100%;width:0;background:#7fd0a8;transition:width .2s}
+#pageno{font-variant-numeric:tabular-nums;font-size:.85em;min-width:64px;text-align:center}
+.legend{display:flex;gap:8px;font-size:.78em}
+.legend span{padding:0 .6em;border-radius:999px;font-weight:800}
+.legend .lb{background:var(--buy)}
+.legend .ls{background:var(--sell)}
+#hud button{
+  background:#fff;color:var(--ink);border:none;border-radius:6px;font:inherit;font-weight:800;
+  font-size:.8em;padding:.35em .8em;cursor:pointer;
+}
+#hud button:hover{background:#e6ecf4}
+#hud button:focus-visible{outline:2px solid #7fd0a8}
+.navzone{position:fixed;top:0;bottom:var(--hud-h);width:12%;z-index:5;cursor:pointer}
+#prevzone{left:0}
+#nextzone{right:0}
+@media(max-width:520px){
+  .legend{display:none}
+  .days{grid-template-columns:1fr;gap:8px}
+  .days .d-num{font-size:26px;padding:0}
+}
+
+@media print{
+  #hud,.navzone{display:none}
+  #deck{height:auto}
+  .slide{display:block;page-break-after:always;height:auto;min-height:90vh}
+}
+</style>
+</head>
+<body>
+
+<main id="deck">
+
+<!-- 1 表紙 -->
+<section class="slide cover" data-title="表紙">
+  <div class="inner">
+    <div class="cover-badges">
+      <span class="chip gain">🎁 株主優待</span>
+      <span class="chip buy">買い</span>
+      <span class="chip sell">売り</span>
+      <span class="chip ghost">日興・楽天・SBI・イースマ対応</span>
+    </div>
+    <h1>優待クロスの<br>トリセツ</h1>
+    <p class="lead">株主優待を<strong>「値動きゼロ」</strong>でもらう方法を、絵でおぼえる19枚。</p>
+    <div class="hint">
+      <span><b>→</b> / クリック右はし … つぎへ</span>
+      <span><b>←</b> / クリック左はし … まえへ</span>
+      <span><b>スワイプ</b>でもめくれます</span>
+    </div>
+    <p class="note">数値は2026年7月しらべ。手数料・時間はよく変わるので、発注前にかならず各社の公式サイトで確認してください。これは投資助言ではありません。</p>
+  </div>
+</section>
+
+<!-- 2 もくじ -->
+<section class="slide" data-title="もくじ">
+  <div class="inner">
+    <p class="eyebrow"><span class="no">2</span>MOKUJI</p>
+    <h2>もくじ <small style="font-size:.5em;font-weight:600;color:var(--muted)">(タップでジャンプ)</small></h2>
+    <div class="toc">
+      <div class="toc-group">
+        <h3>しくみをしる</h3>
+        <button data-go="3">優待クロスってなに? <span class="pg">3</span></button>
+        <button data-go="4">値動きゼロのしくみ <span class="pg">4</span></button>
+        <button data-go="5">だいじな3つの日 <span class="pg">5</span></button>
+        <button data-go="6">基本の4ステップ <span class="pg">6</span></button>
+      </div>
+      <div class="toc-group">
+        <h3>やりかたをえらぶ</h3>
+        <button data-go="7">手法A 現物クロス <span class="pg">7</span></button>
+        <button data-go="8">手法B 現引きクロス(日興) <span class="pg">8</span></button>
+        <button data-go="9">かかるお金の計算 <span class="pg">9</span></button>
+        <button data-go="10">4社くらべ <span class="pg">10</span></button>
+        <button data-go="11">夜の在庫スケジュール <span class="pg">11</span></button>
+      </div>
+      <div class="toc-group">
+        <h3>危険としっぱい</h3>
+        <button data-go="12">逆日歩ってなに? <span class="pg">12</span></button>
+        <button data-go="13">逆日歩狩り(上級) <span class="pg">13</span></button>
+        <button data-go="14">しっぱい図鑑① 片約定 <span class="pg">14</span></button>
+        <button data-go="15">しっぱい図鑑② 忘れもの <span class="pg">15</span></button>
+        <button data-go="16">しっぱい図鑑③ まちがい <span class="pg">16</span></button>
+        <button data-go="17">こまったときの合言葉 <span class="pg">17</span></button>
+      </div>
+      <div class="toc-group">
+        <h3>まとめ</h3>
+        <button data-go="18">直前チェックリスト <span class="pg">18</span></button>
+        <button data-go="19">やくそく <span class="pg">19</span></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 優待クロスってなに -->
+<section class="slide" data-title="優待クロスってなに?">
+  <div class="inner">
+    <p class="eyebrow"><span class="no">3</span>WHAT IS YUTAI CROSS</p>
+    <h2>優待クロスってなに?</h2>
+    <p class="lead"><strong>株主優待(かぶぬしゆうたい)</strong>=株を持っている人だけがもらえるプレゼント。お食事券、クオカード、カタログギフト…。</p>
+    <div class="vs">
+      <div class="v-box ng">
+        <div class="big-emoji">😰</div>
+        <h3>ふつうに株を買うと…</h3>
+        <p>優待はもらえるけど、<span class="buy-t">株が値下がりしたら大損</span>するかもしれない。優待2,000円ぶんのために2万円下がったら大赤字。</p>
+      </div>
+      <div class="v-box ok">
+        <div class="big-emoji">😊</div>
+        <h3>優待クロスなら…</h3>
+        <p><strong>値下がりの心配をゼロ</strong>にして、優待だけもらえる。かわりに、数十円〜数百円の<strong>手数料的なコスト</strong>をはらう。</p>
+      </div>
+    </div>
+    <div class="callout">
+      <strong class="gain-t">もらえる優待の価値 − かかるコスト = とく!</strong><br>
+      <span class="note">これがプラスになる銘柄だけをやる。それが優待クロスの全部。</span>
+    </div>
+  </div>
+</section>
+
+<!-- 4 しくみ -->
+<section class="slide" data-title="値動きゼロのしくみ">
+  <div class="inner">
+    <p class="eyebrow"><span class="no">4</span>HOW IT WORKS</p>
+    <h2>値動きゼロのしくみ = 「買い」と「売り」を同時に持つ</h2>
+    <div class="seesaw" role="img" aria-label="買いと売りが同数で釣り合っているシーソーの図">
+      <div class="plank">
+        <div class="box b">買い 100株<small>上がると+ / 下がると−</small></div>
+        <div class="box s">売り 100株<small>上がると− / 下がると+</small></div>
+      </div>
+      <div class="pivot"></div>
+      <p class="caption">どっちに動いても、合計はいつも <span class="gain-t">±0円</span></p>
+    </div>
+    <div class="panel">
+      <p>「売り」には<strong>信用取引(しんようとりひき)</strong>を使う。証券会社から<strong>株を借りて売る</strong>しくみで、借りたぶんはあとで株で返せる(これが現渡し)。</p>
+      <p class="note">株主名簿にのるのは「買い」のほう。だから優待は買いの側でもらえて、売りは値下がりをふせぐ保険になる。</p>
+    </div>
+  </div>
+</section>
+
+<!-- 5 3つの日 -->
+<section class="slide" data-title="だいじな3つの日">
+  <div class="inner">
+    <p class="eyebrow"><span class="no">5</span>3 IMPORTANT DAYS</p>
+    <h2>だいじな3つの日</h2>
+    <div class="days">
+      <div class="day k1">
+        <div class="d-head">権利付最終日(けんりつきさいしゅうび)</div>
+        <div class="d-num">29日</div>
+        <div class="d-desc"><b>この日の夜(15:30)まで</b>買いを持っていたら優待ゲット。権利確定日の2営業日前</div>
+      </div>
+      <div class="day k2">
+        <div class="d-head">権利落ち日(けんりおちび)</div>
+        <div class="d-num">30日</div>
+        <div class="d-desc">翌営業日。<b>この日から現渡しOK</b>。優待はもう確保ずみ</div>
+      </div>
+      <div class="day k3">
+        <div class="d-head">権利確定日</div>
+        <div class="d-num">31日</div>
+        <div class="d-desc">会社が株主名簿をしめる日。だいたい月末</div>
+      </div>
+    </div>
+    <p class="days-arrow">29日の夜をまたぐ → 30日にあとかたづけ、が優待クロスのリズム(日付は月末銘柄の例)</p>
+    <div class="callout warn">
+      <strong>まちがえやすい!</strong> 優待がもらえるかどうかは「29日(権利付最終日)」で決まる。31日に買っても間にあわない。
+    </div>
+  </div>
+</section>
+
+<!-- 6 4ステップ -->
+<section class="slide" data-title="基本の4ステップ">
+  <div class="inner">
+    <p class="eyebrow"><span class="no">6</span>4 STEPS</p>
+    <h2>基本の4ステップ</h2>
+    <div class="steps">
+      <div class="step"><span class="s-no">1</span>
+        <p class="when">夜(前の日まで)</p>
+        <h3>在庫かくほ</h3>
+        <p>「<span class="sell-t">一般信用売り</span>」の在庫(売れる株のわく)をとる。人気銘柄は早い者勝ち・抽選!</p>
+      </div>
+      <div class="step"><span class="s-no">2</span>
+        <p class="when">夜〜朝8:59</p>
+        <h3>同時ちゅうもん</h3>
+        <p><span class="buy-t">買い</span>と<span class="sell-t">売り</span>を同じ数だけ「成行(なりゆき)」でセット発注 → 朝いちばん(寄付)に同じ値段で成立</p>
+      </div>
+      <div class="step"><span class="s-no">3</span>
+        <p class="when">権利付最終日</p>
+        <h3>夜をまたぐ</h3>
+        <p>15:30の大引けをこえたら優待けってい🎁 なにもしなくてOK</p>
+      </div>
+      <div class="step"><span class="s-no">4</span>
+        <p class="when">権利落ち日</p>
+        <h3>現渡し(げんわたし)</h3>
+        <p>持っている株で「売り」を返して、両方いっぺんに消す。<b>手数料0円</b></p>
+      </div>
+    </div>
+    <div class="callout">
+      <strong>ポイント:</strong> ステップ2は<strong>市場が開く前</strong>に出すこと。開いている時間に別々に出すと、値段がずれて損したり、ルール違反(仮装売買)とうたがわれたりする。
+    </div>
+  </div>
+</section>
+
+<!-- 7 手法A -->
+<section class="slide" data-title="手法A 現物クロス">
+  <div class="inner">
+    <p class="eyebrow"><span class="no">7</span>METHOD A</p>
+    <h2>手法A 現物クロス <span class="chip gain">楽天・SBI・イースマ向け</span></h2>
+    <p class="lead">現物(げんぶつ)=ふつうの株の買い方。<strong>買いがタダの会社</strong>ならこれがいちばんシンプル。</p>
+    <div class="flow">
+      <div class="f-box b">現物買い<small>手数料0円</small></div>
+      <div class="f-arrow">+</div>
+      <div class="f-box s">一般信用売り<small>同じ数・同時に</small></div>
+      <div class="f-arrow">→</div>
+      <div class="f-box">夜をまたぐ<small>優待ゲット🎁</small></div>
+      <div class="f-arrow">→</div>
+      <div class="f-box g">現渡し<small>0円でおしまい</small></div>
+    </div>
+    <div class="panel">
+      <p><strong>かかるお金は「貸株料(かしかぶりょう)」だけ。</strong>株を借りるレンタル料で、1日あたり数円〜数十円(→ 9枚目で計算)。</p>
+      <p class="note">楽天は「らくらく優待取引」を使うと、買い+売り+現渡し予約まで1回で発注できて忘れ物ゼロ。</p>
+    </div>
+  </div>
+</section>
+
+<!-- 8 手法B -->
+<section class="slide" data-title="手法B 現引きクロス">
+  <div class="inner">
+    <p class="eyebrow"><span class="no">8</span>METHOD B</p>
+    <h2>手法B 現引きクロス <span class="chip ghost">日興はこれ一択</span></h2>
+    <p class="lead">日興は<strong>現物を買うと手数料がかかる</strong>(100万円で880円)。でも信用取引は0円。だから<strong>信用で買って、株に引きかえる</strong>。</p>
+    <div class="flow">
+      <div class="f-box b">制度信用買い<small>手数料0円</small></div>
+      <div class="f-arrow">+</div>
+      <div class="f-box s">一般信用売り<small>同じ数・同時に</small></div>
+      <div class="f-arrow">→</div>
+      <div class="f-box g">現引き(げんびき)<small>その日のうちに!0円</small></div>
+      <div class="f-arrow">→</div>
+      <div class="f-box">夜をまたぐ<small>優待ゲット🎁</small></div>
+      <div class="f-arrow">→</div>
+      <div class="f-box g">現渡し<small>0円</small></div>
+    </div>
+    <div class="callout danger">
+      <strong class="warn-t">⚠️ 現引きを忘れると優待がもらえない!</strong><br>
+      <span class="note">信用の買いのままでは株主名簿にのらない。約定したら<strong>その場で現引き</strong>がおやくそく(日興は当日15:30まで)。</span>
+    </div>
+  </div>
+</section>
+
+<!-- 9 コスト -->
+<section class="slide" data-title="かかるお金の計算">
+  <div class="inner">
+    <p class="eyebrow"><span class="no">9</span>COST</p>
+    <h2>かかるお金 = ほぼ「貸株料」だけ</h2>
+    <div class="formula">
+      貸株料 = 株の代金 × <span class="hl">年率</span> × <span class="hl">日数</span> ÷ 365
+    </div>
+    <div class="panel">
+      <p><strong>例:</strong> <span class="num">100万円</span>の株を、年率<span class="num">1.9%</span>(日興)で<span class="num">7日間</span>借りたら…<br>
+      <span class="num">100万 × 1.9% × 7 ÷ 365 = <strong>約364円</strong></span>。優待が2,000円ぶんなら大勝ち。</p>
+    </div>
+    <div class="vs">
+      <div class="v-box">
+        <h3>📅 日数は「土日祝もカウント」</h3>
+        <p>週末をはさむと日数が増えてコストも増える。日数は受渡日(うけわたしび)ベースで、<strong>借りた日と返した日の両方をかぞえる(両端入れ)</strong>。最短でも2日ぶん。</p>
+      </div>
+      <div class="v-box">
+        <h3>💰 配当がある銘柄は立てかえあり</h3>
+        <p>いったん配当の約20%ぶんを立てかえる(あとで税金の計算でだいたい戻ってくる)。くわしくは manual/09-faq.md。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 10 4社くらべ -->
+<section class="slide" data-title="4社くらべ">
+  <div class="inner">
+    <p class="eyebrow"><span class="no">10</span>4 BROKERS</p>
+    <h2>4社くらべ(2026年7月しらべ)</h2>
+    <div class="cards">
+      <div class="card">
+        <div class="c-head" style="background:#0f4c81">日興 <small>SMBC日興証券</small></div>
+        <ul>
+          <li>💴 信用0円 / <b>現物は有料</b> → <b>手法B必須</b></li>
+          <li>📦 一般信用は<b>3年型 1.90%</b>のみ</li>
+          <li>🕠 在庫は<b>17:30</b>受付再開でよーいドン</li>
+          <li>✏️ 現渡し予約は17:30から</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="c-head" style="background:#a3202f">楽天証券</div>
+        <ul>
+          <li>💴 ゼロコースで<b>ぜんぶ0円</b></li>
+          <li>📦 短期14日 3.90% / 無期限 1.10%</li>
+          <li>🕖 在庫は<b>19:00頃</b>・早い者勝ち</li>
+          <li>🎯 <b>らくらく優待取引</b>=現渡し忘れゼロ</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="c-head" style="background:#1a6e8e">SBI証券</div>
+        <ul>
+          <li>💴 ゼロ革命で0円(<b>電子交付設定が条件</b>)</li>
+          <li>📦 短期15営業日 3.90% / 無期限 1.10%</li>
+          <li>🕖 在庫は<b>19:00</b>・4社でいちばん激戦</li>
+          <li>👀 残りは「◎▲×」でしか見えない</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="c-head" style="background:#7a1f5c">イースマ <small>三菱UFJ eスマート証券</small></div>
+        <ul>
+          <li>💴 SOR選択で0円(チェック外すと有料)</li>
+          <li>📦 長期 <b>1.10%</b>+人気銘柄は<b>プレミアム料</b></li>
+          <li>🎫 品薄銘柄は<b>19:30〜20:30の抽選</b></li>
+          <li>⏰ 現渡しは<b>15:45以降</b>(早いと権利パー)</li>
+        </ul>
+      </div>
+    </div>
+    <p class="note">料率のいちばん安い組:楽天/SBI無期限・イースマ長期(1.10%)→ 日興(1.90%)→ 短期組(3.90%)。でも実際は「ほしい銘柄の在庫がどこにあるか」がすべて。</p>
+  </div>
+</section>
+
+<!-- 11 夜のスケジュール -->
+<section class="slide" data-title="夜の在庫スケジュール">
+  <div class="inner">
+    <p class="eyebrow"><span class="no">11</span>NIGHT ROUTINE</p>
+    <h2>夜の在庫スケジュール(毎営業日)</h2>
+    <div class="timeline">
+      <div class="t-row">
+        <div class="t-time num">17:10ごろ</div>
+        <div class="t-dotcol"><span class="t-dot"></span><span class="t-line"></span></div>
+        <div class="t-body"><b>日興</b> の在庫表示が更新される <span class="co">(ここで下見)</span></div>
+      </div>
+      <div class="t-row hot">
+        <div class="t-time num">17:30</div>
+        <div class="t-dotcol"><span class="t-dot"></span><span class="t-line"></span></div>
+        <div class="t-body"><b>日興 受付さいかい=よーいドン!</b> <span class="co">先着順。人気銘柄は数十秒</span></div>
+      </div>
+      <div class="t-row hot">
+        <div class="t-time num">19:00</div>
+        <div class="t-dotcol"><span class="t-dot"></span><span class="t-line"></span></div>
+        <div class="t-body"><b>SBI・楽天 の在庫かいほう</b> <span class="co">先着順。2画面よういして同時にねらう</span></div>
+      </div>
+      <div class="t-row">
+        <div class="t-time num">19:30〜20:30</div>
+        <div class="t-dotcol"><span class="t-dot"></span><span class="t-line"></span></div>
+        <div class="t-body"><b>イースマ 抽選もうしこみ</b> <span class="co">あわてなくてOK。20:30までに申しこめば平等</span></div>
+      </div>
+      <div class="t-row">
+        <div class="t-time num">21:00〜</div>
+        <div class="t-dotcol"><span class="t-dot"></span></div>
+        <div class="t-body"><b>イースマ 残り在庫の先着</b> <span class="co">当選発表(20:30〜)のあと、余りがあれば</span></div>
+      </div>
+    </div>
+    <div class="callout"><strong>コツ:</strong> 銘柄と株数を先に決めて、注文画面まで入力してから時報を待つ。当選前に買いを出さない(イースマ)。</div>
+  </div>
+</section>
+
+<!-- 12 逆日歩 -->
+<section class="slide" data-title="逆日歩ってなに?">
+  <div class="inner">
+    <p class="eyebrow"><span class="no">12</span>GYAKUHIBU</p>
+    <h2>逆日歩(ぎゃくひぶ)ってなに?</h2>
+    <p class="lead">信用売りには2種類ある。えらび方をまちがえると、こわいお金がかかる。</p>
+    <div class="vs">
+      <div class="v-box ok">
+        <div class="big-emoji">😊</div>
+        <h3>一般信用売り</h3>
+        <p><strong>逆日歩なし。</strong>証券会社が自分で用意した株を借りる。そのかわり<strong>在庫にかぎりがある</strong>(だから争奪戦になる)。</p>
+      </div>
+      <div class="v-box ng">
+        <div class="big-emoji">😱</div>
+        <h3>制度信用売り</h3>
+        <p><strong>逆日歩があるかも。</strong>市場全体で株がたりなくなると、借り賃オークションの追加料金を<strong>売った人全員が払う</strong>。いくらになるか<strong>翌日までわからない</strong>。上限も権利日はふだんの4倍。</p>
+      </div>
+    </div>
+    <div class="callout danger">
+      <strong>実話:</strong> 2025年12月、優待5万円ぶんをねらって制度信用で売った人が、逆日歩<strong class="num">約144万円</strong>を払うことに(1株あたり計48円 × 3万株)。<br>
+      <span class="note">→ だから優待クロスは<strong>一般信用売りが基本</strong>。制度でやるのは上級者のギャンブル(manual/08参照)。</span>
+    </div>
+  </div>
+</section>
+
+<!-- 13 逆日歩狩り -->
+<section class="slide" data-title="逆日歩狩り">
+  <div class="inner">
+    <p class="eyebrow"><span class="no">13</span>ADVANCED</p>
+    <h2>逆日歩狩り(上級ワザ)= もらう側にまわる</h2>
+    <p class="lead">逆日歩は、売った人が払って<strong>制度信用で買った人がもらえる</strong>。それなら高い逆日歩がつきそうな銘柄で、もらう側に立とう、というワザ。優待はもらえない。ねらいは逆日歩そのもの。</p>
+    <div class="flow">
+      <div class="f-box b">制度信用買い<small>逆日歩を<b>もらう</b></small></div>
+      <div class="f-arrow">+</div>
+      <div class="f-box s">一般信用売り<small>自分は払わない</small></div>
+      <div class="f-arrow">→</div>
+      <div class="f-box">夜をまたぐ<small>現引きしない!</small></div>
+      <div class="f-arrow">→</div>
+      <div class="f-box g">両方を決済</div>
+    </div>
+    <div class="vs">
+      <div class="v-box ok">
+        <h3>もらえるもの</h3>
+        <p>逆日歩 × 株数 × 日数 + 配当調整金(配当の84.685%)</p>
+      </div>
+      <div class="v-box ng">
+        <h3>はらうもの</h3>
+        <p>貸株料 + 配当調整金(配当の100%)→ <b>差し引き配当の15.315%は持ち出し</b> + 名義書換料55円/単元</p>
+      </div>
+    </div>
+    <p class="note"><strong class="warn-t">逆日歩が0円だったらコストだけ払って負け。</strong>本質はギャンブル。毎年高逆日歩がつく常連銘柄を過去実績でしらべてから(manual/08-gyakuhibu.md)。</p>
+  </div>
+</section>
+
+<!-- 14 失敗1 -->
+<section class="slide" data-title="しっぱい図鑑① 片約定">
+  <div class="inner">
+    <p class="eyebrow"><span class="no">14</span>TROUBLE 1</p>
+    <h2>しっぱい図鑑① 片約定(かたやくじょう)</h2>
+    <div class="fails">
+      <div class="fail">
+        <div class="f-head"><span>買いと売りの片方だけ成立しちゃった</span><span class="sev">危険度 ★★★</span></div>
+        <div class="f-body">
+          <div class="f-sym">
+            <h4>SYMPTOM どんな状態?</h4>
+            <p>シーソーの片側だけ。<strong>値動きの波にナマ身でさらされている</strong>、優待クロスでいちばん危ない状態。ストップ高で寄らない日などに起こる。</p>
+          </div>
+          <div class="f-fix">
+            <h4>RESCUE いますぐやること</h4>
+            <ol>
+              <li><strong>そろえる:</strong> 反対側を成行ですぐ入れてシーソーを水平に(値段の差はその場で確定、以降は安全)</li>
+              <li><strong>または にげる:</strong> 成立した側をすぐ決済して、なかったことにする</li>
+            </ol>
+            <p class="note"><strong class="warn-t">「戻るまで待つ」だけはダメ。</strong>それはもう優待クロスじゃなくて、ただのバクチ。</p>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <p><strong>よぼう:</strong> 夜のうちに買い・売りをセットで発注 → 発注後に<strong>注文一覧で2本そろっているか指さし確認</strong>。ストップ高になりそうな日は両方とりけす。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 15 失敗2 -->
+<section class="slide" data-title="しっぱい図鑑② 忘れもの">
+  <div class="inner">
+    <p class="eyebrow"><span class="no">15</span>TROUBLE 2</p>
+    <h2>しっぱい図鑑② 忘れもの</h2>
+    <div class="fails">
+      <div class="fail">
+        <div class="f-head"><span>現引きわすれ(手法Bの人)</span><span class="sev">危険度 ★★☆</span></div>
+        <div class="f-body">
+          <div class="f-sym">
+            <h4>SYMPTOM</h4>
+            <p>信用買いのまま権利日をまたぎそう/またいだ。<strong>このままでは優待がもらえない。</strong></p>
+          </div>
+          <div class="f-fix">
+            <h4>RESCUE</h4>
+            <ol>
+              <li><strong>締切前(日興15:30)なら:</strong> いますぐ現引き。まにあえば無傷</li>
+              <li><strong>すぎていたら:</strong> 優待はあきらめる。買いと売りはそろっていて安全なので、あわてず翌日以降に両方を静かに解消(損はコスト数百円ていど)</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+      <div class="fail">
+        <div class="f-head"><span>現渡しわすれ</span><span class="sev">危険度 ★☆☆</span></div>
+        <div class="f-body">
+          <div class="f-sym">
+            <h4>SYMPTOM</h4>
+            <p>権利落ち日に現渡しするのを忘れて、貸株料がチャリンチャリン増えている。</p>
+          </div>
+          <div class="f-fix">
+            <h4>RESCUE</h4>
+            <ol>
+              <li>気づいた時点で現渡しすればOK(1日あたり数十円レベル。あわてない)</li>
+              <li><strong class="warn-t">短期(楽天14日・SBI15営業日)だけは要注意:</strong> 期限をすぎると強制決済。期限内にかならず現渡し</li>
+            </ol>
+            <p class="note">よぼう: 現渡しは<strong>予約発注</strong>(権利付最終日の夜)か楽天「らくらく優待取引」で自動化。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 16 失敗3 -->
+<section class="slide" data-title="しっぱい図鑑③ まちがい系">
+  <div class="inner">
+    <p class="eyebrow"><span class="no">16</span>TROUBLE 3</p>
+    <h2>しっぱい図鑑③ まちがい系</h2>
+    <div class="fails">
+      <div class="fail">
+        <div class="f-head"><span>「一般」のつもりが制度信用で売ってた</span><span class="sev">危険度 ★★★</span></div>
+        <div class="f-body">
+          <div class="f-sym">
+            <h4>SYMPTOM</h4>
+            <p>逆日歩(青天井の追加料金)がかかるかもしれない状態。在庫切れのとき、画面が制度信用をすすめてくることがある。</p>
+          </div>
+          <div class="f-fix">
+            <h4>RESCUE</h4>
+            <ol>
+              <li><strong>権利付最終日の大引け前:</strong> まだ逆日歩は発生していない。<strong>すぐ返済してやり直し</strong>(買い側もセットで)</li>
+              <li><strong>大引け後:</strong> 発生は確定。<strong>権利落ち日に即現渡し</strong>して日数を1日で止める。昼の逆日歩速報で金額確認</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+      <div class="fail">
+        <div class="f-head"><span>現渡しが早すぎた(権利日の日中に出しちゃった)</span><span class="sev">危険度 ★★☆</span></div>
+        <div class="f-body">
+          <div class="f-sym">
+            <h4>SYMPTOM</h4>
+            <p>権利付最終日の日中に現渡しが成立すると、その日のうちに手放したことになり<strong>優待の権利がパー</strong>。現渡しは取消できない。</p>
+          </div>
+          <div class="f-fix">
+            <h4>RESCUE</h4>
+            <ol>
+              <li><strong>大引け前に気づいたら:</strong> 在庫がまだあれば、もう一度クロスを組み直せる(買い+売りを大引けまでに約定)</li>
+              <li><strong>大引け後:</strong> 優待はあきらめる。ポジションは消えているので追加の損はなし</li>
+            </ol>
+            <p class="note">よぼう: 現渡しは<strong>翌営業日あつかいになる時間</strong>に出す — イースマ15:45〜 / SBI16:00すぎ〜 / 日興17:30〜 / 楽天は権利落ち日の朝7:30〜。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 17 合言葉 -->
+<section class="slide" data-title="こまったときの合言葉">
+  <div class="inner">
+    <p class="eyebrow"><span class="no">17</span>MANTRA</p>
+    <h2>こまったときの合言葉</h2>
+    <div class="mantra">
+      <div class="m-row">
+        <span class="m-no">1</span>
+        <div><b>「そろってる?」</b>
+        <p>買いと売りが同じ数なら、損は時間ぶんのコストだけ。あわてなくていい。そろっていないなら、そろえるか逃げるかを最優先。</p></div>
+      </div>
+      <div class="m-row">
+        <span class="m-no">2</span>
+        <div><b>「大引けの前? 後?」</b>
+        <p>権利付最終日の15:30より前なら、立て直しがきく。後なら被害を小さくする方向に切りかえ。</p></div>
+      </div>
+      <div class="m-row">
+        <span class="m-no">3</span>
+        <div><b>「中立がさき、優待はおまけ」</b>
+        <p>優待をおしんで危ない状態をつづけるのが最悪手。失敗の授業料はたいてい数十〜数百円。早くたたむのがけっきょく安い。</p></div>
+      </div>
+    </div>
+    <p class="note">ケース別のくわしい手順(数量ちがい・NISAで買っちゃった等ぜんぶで11ケース)→ <strong>manual/11-recovery.md</strong></p>
+  </div>
+</section>
+
+<!-- 18 チェックリスト -->
+<section class="slide" data-title="直前チェックリスト">
+  <div class="inner">
+    <p class="eyebrow"><span class="no">18</span>CHECKLIST</p>
+    <h2>発注前・直前チェックリスト</h2>
+    <div class="checks">
+      <div class="check"><span class="cb"></span><span>銘柄コード・株数・<b>権利月</b>はあってる?(優待は年1回の会社もある)</span></div>
+      <div class="check"><span class="cb"></span><span>売りは「<b>一般</b>信用」になってる?(<span class="buy-t">制度</span>になってない?)</span></div>
+      <div class="check"><span class="cb"></span><span><span class="buy-t">買い</span>と<span class="sell-t">売り</span>、<b>同じ数</b>?(300と100になってない?)</span></div>
+      <div class="check"><span class="cb"></span><span>注文は<b>市場が閉まっている時間</b>(夜〜朝8:59)に成行で出した?</span></div>
+      <div class="check"><span class="cb"></span><span>買いの口座は<b>特定口座</b>?(NISAだと現渡しに使えない)</span></div>
+      <div class="check"><span class="cb"></span><span>(手法Bの人)約定したら<b>その場で現引き</b>した?</span></div>
+      <div class="check"><span class="cb"></span><span>現渡し予約した? イースマ15:45〜 / SBI16:00すぎ〜 / 日興17:30〜 / 楽天は翌朝(らくらく優待取引なら自動)</span></div>
+      <div class="check"><span class="cb"></span><span>配当がある銘柄 → <b>3〜4ヶ月後の引き落とし</b>用にお金を残してある?</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 19 やくそく -->
+<section class="slide" data-title="やくそく">
+  <div class="inner">
+    <p class="eyebrow"><span class="no">19</span>PROMISE</p>
+    <h2>さいごに、3つのやくそく</h2>
+    <div class="mantra">
+      <div class="m-row"><span class="m-no">📅</span>
+        <div><b>数字はナマモノ</b>
+        <p>このスライドの手数料・料率・時刻は<strong>2026年7月しらべ</strong>。日興は2026年に2回も料率が変わった。発注前にかならず公式サイトで最新を確認。</p></div>
+      </div>
+      <div class="m-row"><span class="m-no">📖</span>
+        <div><b>くわしくは手引書へ</b>
+        <p>計算式・出典・ぜんぶのルールは <strong>manual/</strong> フォルダの11ページに。このリポジトリで Claude に質問すると、手引書を見て答えてくれます。</p></div>
+      </div>
+      <div class="m-row"><span class="m-no">⚖️</span>
+        <div><b>じぶんの責任で</b>
+        <p>もうけを約束するものではありません。優待の変更・廃止、制度の変更もあります。むりのない金額で。</p></div>
+      </div>
+    </div>
+    <p class="note">おつかれさまでした🎁 ← もくじにもどるには「Home」キー、または下の「もくじ」ボタン。</p>
+  </div>
+</section>
+
+</main>
+
+<div class="navzone" id="prevzone" aria-label="前のスライドへ"></div>
+<div class="navzone" id="nextzone" aria-label="次のスライドへ"></div>
+
+<footer id="hud">
+  <button id="tocbtn" type="button">もくじ</button>
+  <div id="bar"><i></i></div>
+  <div id="pageno" class="num">1 / 19</div>
+  <div class="legend"><span class="lb">買い=赤</span><span class="ls">売り=青</span></div>
+</footer>
+
+<script>
+(function(){
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var total = slides.length;
+  var cur = 0;
+  var bar = document.querySelector('#bar i');
+  var pageno = document.getElementById('pageno');
+
+  function goTo(i){
+    if(i < 0) i = 0;
+    if(i > total - 1) i = total - 1;
+    slides[cur].classList.remove('active');
+    cur = i;
+    slides[cur].classList.add('active');
+    slides[cur].scrollTop = 0;
+    bar.style.width = ((cur + 1) / total * 100) + '%';
+    pageno.textContent = (cur + 1) + ' / ' + total;
+    if(history.replaceState) history.replaceState(null, '', '#s' + (cur + 1));
+  }
+  function next(){ goTo(cur + 1); }
+  function prev(){ goTo(cur - 1); }
+
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); next(); }
+    else if(e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); prev(); }
+    else if(e.key === 'Home') { e.preventDefault(); goTo(1); }
+  });
+  document.getElementById('nextzone').addEventListener('click', next);
+  document.getElementById('prevzone').addEventListener('click', prev);
+  document.getElementById('tocbtn').addEventListener('click', function(){ goTo(1); });
+
+  Array.prototype.forEach.call(document.querySelectorAll('[data-go]'), function(btn){
+    btn.addEventListener('click', function(){ goTo(parseInt(btn.getAttribute('data-go'), 10) - 1); });
+  });
+
+  var tx = null;
+  document.addEventListener('touchstart', function(e){ tx = e.changedTouches[0].clientX; }, {passive:true});
+  document.addEventListener('touchend', function(e){
+    if(tx === null) return;
+    var dx = e.changedTouches[0].clientX - tx;
+    if(Math.abs(dx) > 60){ if(dx < 0) next(); else prev(); }
+    tx = null;
+  }, {passive:true});
+
+  var start = 0;
+  var m = location.hash.match(/^#s(\d+)$/);
+  if(m) start = Math.min(Math.max(parseInt(m[1], 10) - 1, 0), total - 1);
+  slides[0].classList.add('active');
+  goTo(start);
+})();
+</script>
+</body>
+</html>
