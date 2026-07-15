@@ -148,8 +148,8 @@
   table.breakdown td.amt { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
   table.breakdown .formula { display: block; font-size: 10.5px; color: var(--sub); }
   table.breakdown tr.zero td { color: var(--zero); }
-  /* 内訳の強調: 事務管理費=赤(額が発生した行だけ。0円行は上のグレー)。青は合計の総額に使う */
-  table.breakdown tr.fee-admin td { color: var(--danger); font-weight: 600; }
+  /* 内訳の強調: 事務管理費=青(額が発生した行だけ。0円行は上のグレー)。合計と同じ青で目立たせる */
+  table.breakdown tr.fee-admin td { color: var(--accent); font-weight: 600; }
   .warnbox { margin-top: 8px; font-size: 11.5px; color: var(--warn); background: var(--warn-bg); border-radius: 7px; padding: 6px 9px; }
   .warnbox div + div { margin-top: 3px; }
 
@@ -239,7 +239,7 @@
       <span><span class="chip manual">手入力</span>自動では入らない欄 — 自分で入力する</span>
       <span><span class="chip auto">自動</span>銘柄コードを入れると自動で入る(手直しも可)</span>
       <span>無印: 初期値が自動で入る(ボタンで変更可)</span>
-      <span>色の意味: <b class="com">青=合計</b>(一番見たい総額)・内訳の<b class="adm">赤=事務管理費</b>(かかる時だけ・0円はグレー)</span>
+      <span>色の意味: <b class="com">青=合計</b>(一番見たい総額)と内訳の<b class="com">事務管理費</b>(かかる時だけ・0円はグレー)</span>
     </div>
     <div class="grid">
       <div class="field">
@@ -366,7 +366,7 @@ const DEFAULT_CONFIG = {
       '2026/01/05 日興: 一般(3年)貸株料 1.40%→1.70%、制度買方金利 2.50%→2.97%'
     ],
     tool: [
-      '2026/07/16 入力欄を色分け(黄=手入力が必要/緑=コード入力で自動反映)し凡例を追加/内訳の事務管理費を赤・手数料を青で強調(かかる時だけ。0円はグレーのまま)/日程パネルの事務管理費境界を赤表示',
+      '2026/07/16 入力欄を色分け(黄=手入力が必要/緑=コード入力で自動反映)し凡例を追加/合計と内訳の事務管理費を青で強調(かかる時だけ。0円はグレーのまま)/日程パネルの事務管理費境界を赤表示',
       '2026/07/15 スマホ対応の調整(iOSで入力時に画面が自動ズームされる問題の対策ほか)。Windows・スマホからは Artifact リンクをブラウザで開けばそのまま使える',
       '2026/07/15 制度信用売り選択時に逆日歩の最悪ケース額を自動計算(日証金の最高料率算定式×権利付最終日4倍×品貸日数。規則原文で式を確認)',
       '2026/07/15 プレミアム料・HYPER料を打ったそばから即反映するよう修正(「欄の外をクリックするまで反映されない」問題の解消)/銘柄名からの逆引き検索を追加(2文字で候補→選ぶとコード・株価まで自動)',
@@ -892,7 +892,7 @@ function renderCards() {
     if (!r) {
       body = '<div class="total"><span class="num" style="color:var(--zero)">—</span></div><div style="font-size:12px;color:var(--sub)">株価・株数・日付を入力してください</div>';
     } else {
-      // 内訳の色分け: 0円はグレー、事務管理費は赤(額が発生した行だけ)。青は下の合計に使う
+      // 内訳の色分け: 0円はグレー、事務管理費は青(額が発生した行だけ。合計と同じ青で強調)
       const rowClass = it => it.amount === 0 ? 'zero'
         : it.label.startsWith('事務管理費') ? 'fee-admin' : '';
       const rows = r.items.map(it => `
