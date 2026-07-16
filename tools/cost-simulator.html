@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>優待クロス シュミレーター</title>
+<title>優待クロス シミュレーター</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><g fill='%230f5fa8'><ellipse cx='50' cy='64' rx='23' ry='19'/><ellipse cx='22' cy='40' rx='9' ry='12'/><ellipse cx='41' cy='26' rx='9' ry='13'/><ellipse cx='59' cy='26' rx='9' ry='13'/><ellipse cx='78' cy='40' rx='9' ry='12'/></g></svg>">
 <style>
   :root {
@@ -273,7 +273,7 @@
 <div class="wrap">
 
   <header>
-    <h1><span class="brandpaws" aria-hidden="true"><svg class="bp bp1"><use href="#ico-paw"/></svg><svg class="bp bp2"><use href="#ico-paw"/></svg></span><span>優待クロス シュミレーター</span></h1>
+    <h1><span class="brandpaws" aria-hidden="true"><svg class="bp bp1"><use href="#ico-paw"/></svg><svg class="bp bp2"><use href="#ico-paw"/></svg></span><span>優待クロス シミュレーター</span></h1>
     <span class="survey">料率初期値: <span id="surveyDate"></span> 調査(manual/ 準拠)</span>
     <span class="spacer"></span>
     <button id="btnSettings">⚙ 料率・祝日の設定</button>
@@ -420,7 +420,7 @@ const DEFAULT_CONFIG = {
       '2026/01/05 日興: 一般(3年)貸株料 1.40%→1.70%、制度買方金利 2.50%→2.97%'
     ],
     tool: [
-      '2026/07/16 デザインに猫モチーフを追加。題名を「優待クロス シュミレーター」に、見出しに足跡2つ、最安バッジと最安カードに足跡、お得な時(コスト率が目安の半分以下)の「激安にゃ!」スタンプ、タブのファビコンも足跡に',
+      '2026/07/16 デザインに猫モチーフを追加。題名を「優待クロス シミュレーター」に、見出しに足跡2つ、最安バッジと最安カードに足跡、お得な時(コスト率が目安の半分以下)の「激安にゃ!」スタンプ、タブのファビコンも足跡に',
       '2026/07/16 事務管理費が発生している場合に「◯/◯頃以降に建てれば0円(目安)」の回避日も表示(発生していない時の境界案内と対になる情報)',
       '2026/07/16 遠い権利(来月末など)で約定日の初期値が1ヶ月以上前になり事務管理費が無駄に出て境界案内が隠れていたのを、管理費が出ない範囲(権利落ちの約1ヶ月前より後)に初期値を自動調整。あわせてSBI短期など返済期限1ヶ月未満の区分で管理費が誤計上されていた不具合を修正(常に0)',
       '2026/07/16 事務管理費の発生境界日に「目安・正確な起算日は各社で要確認」を明記(約定日/受渡日の起算や「1ヶ月ちょうど」の扱いで境界ちょうどの日は1日ずれうるため。通常のクロスなら影響なし)',
