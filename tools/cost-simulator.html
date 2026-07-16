@@ -151,6 +151,7 @@
   .yield .yv { font-size: 16px; font-weight: 700; }
   .yield .yv.gain { color: var(--good); }
   .yield .yv.loss { color: var(--danger); }
+  .yield .yv.over { color: var(--warn); }
   #outYutaiYield { color: var(--accent); font-weight: 700; }
   #outYutaiYield .sub { color: var(--sub); font-weight: 400; margin-left: 4px; }
   table.breakdown { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: auto; }
@@ -361,7 +362,8 @@ const DEFAULT_CONFIG = {
     //                     4社とも公式が両端入れを明記(2026-07-15確認)。'oneEnd' は受渡日の差のみ(参考用)
     countMethod: 'bothEnds',
     rounding: 'floor',      // 円未満の端数: 'floor' 切り捨て / 'round' 四捨五入 / 'ceil' 切り上げ
-    interestDays: 1         // 信用買い→現引きの買方金利日数(受渡日ベース両端入れ: 当日現引き=1日、翌営業日現引き=2日)
+    interestDays: 1,        // 信用買い→現引きの買方金利日数(受渡日ベース両端入れ: 当日現引き=1日、翌営業日現引き=2日)
+    costRateGuide: 20       // コスト率の目安 %(これ以下なら「クロスする」の目安=緑、超えたら警告色)。クロス民の一般的な基準は優待価値の20%
   },
 
   // 株価自動取得に使う CORS 中継URL(上から順に試す。{url} が取得先URLに置換される)
@@ -383,7 +385,7 @@ const DEFAULT_CONFIG = {
     ],
     tool: [
       '2026/07/16 約定日の初期値を修正: 15:30以降に開くと当日約定のままだったのを、翌営業日(=いま発注して約定できる最早日)に繰り上げるように',
-      '2026/07/16 「優待の価値(円)」の任意入力欄を追加 → 優待利回り(優待価値÷約定代金)を欄の下に表示、各社カードにお得額(優待価値−コスト)を表示(空欄なら非表示)',
+      '2026/07/16 「優待の価値(円)」の任意入力欄を追加 → 優待利回り(優待価値÷約定代金)を欄の下に、各社カードにお得額(優待価値−コスト)とコスト率(コスト÷優待価値。20%以下が目安=緑・超えたら警告色。目安は⚙で変更可)を表示(空欄なら非表示)',
       '2026/07/16 日興の制度買方金利改定(2026/7/21約定分〜3.54%。公式告知2026/7/9)を確認。初期値は現行3.27%のまま、7/20頃に3.54%へ切替予定(一般貸株料1.90%は据え置き)',
       '2026/07/16 入力欄を色分け(黄=手入力が必要/緑=コード入力で自動反映)し凡例を追加/合計と内訳の事務管理費を青で強調(かかる時だけ。0円はグレーのまま)/日程パネルの事務管理費境界を赤表示',
       '2026/07/15 スマホ対応の調整(iOSで入力時に画面が自動ズームされる問題の対策ほか)。Windows・スマホからは Artifact リンクをブラウザで開けばそのまま使える',
@@ -929,9 +931,13 @@ function renderCards() {
         const gain = yutai - r.total;
         const gainCls = gain >= 0 ? 'gain' : 'loss';
         const sign = gain >= 0 ? '+' : '−';
+        const costRate = r.total / yutai * 100;
+        const guide = Number(config.calc.costRateGuide) || 20;
+        const rateCls = costRate <= guide ? 'gain' : 'over';  // 目安以下なら緑=クロス推奨、超えたら警告色
         yieldHtml = `
         <div class="yield">
           <span class="yield-item"><span class="yl">お得額(優待${fmtYen(yutai)}円 − コスト)</span><b class="yv ${gainCls}">${sign}${fmtYen(Math.abs(gain))}円</b></span>
+          <span class="yield-item"><span class="yl">コスト率(${guide}%以下が目安)</span><b class="yv ${rateCls}">${costRate.toFixed(1)}%</b></span>
         </div>`;
       }
       body = `
@@ -1229,6 +1235,7 @@ const SETTING_FIELDS = [
   { path: 'calc.rounding', label: '円未満の端数処理', type: 'select',
     options: [['floor', '切り捨て(多くの会社)'], ['round', '四捨五入'], ['ceil', '切り上げ']] },
   { path: 'calc.interestDays', label: '現引きまでの買方金利日数(当日現引き=1、翌営業日=2)', unit: '日' },
+  { path: 'calc.costRateGuide', label: 'コスト率の目安(これ以下なら緑=クロス推奨。クロス民の一般的な基準は20%)', unit: '%' },
   { path: 'priceProxies', label: '株価取得の中継URL(1行1つ・上から順に試す。{url} が取得先URLに置換される。自分専用中継の作り方は tools/price-proxy.gs)', type: 'lines' },
 
   { section: 'SMBC日興証券' },
