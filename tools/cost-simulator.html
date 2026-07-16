@@ -91,6 +91,7 @@
   }
   .chip.manual { color: var(--warn); background: var(--warn-bg); border: 1px solid var(--warn); }
   .chip.auto { color: var(--good); background: var(--good-bg); border: 1px solid var(--good); }
+  .chip.opt { color: var(--sub); background: var(--bg); border: 1px solid var(--line); }
   .field input.manual, .card .opts input.manual { background: var(--warn-bg); border-color: var(--warn); }
   .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 11px; color: var(--sub); margin: -4px 0 12px; }
   .legend .chip { margin-left: 0; margin-right: 4px; }
@@ -143,6 +144,13 @@
   /* 合計(金利・貸株料・管理費など全部足した総額)= 一番見たい数字なので青く大きく強調 */
   .total .num { font-size: 32px; font-weight: 800; letter-spacing: .02em; color: var(--accent); }
   .total .unit { font-size: 13px; color: var(--accent); margin-left: 2px; }
+  /* 利回り(優待価値を入れた時だけ表示): お得額=緑(損なら赤)・コスト率 */
+  .yield { display: flex; gap: 18px; flex-wrap: wrap; margin: 2px 0 10px; }
+  .yield .yield-item { display: flex; flex-direction: column; }
+  .yield .yl { font-size: 10.5px; color: var(--sub); line-height: 1.4; }
+  .yield .yv { font-size: 16px; font-weight: 700; }
+  .yield .yv.gain { color: var(--good); }
+  .yield .yv.loss { color: var(--danger); }
   table.breakdown { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: auto; }
   table.breakdown td { padding: 4px 0; border-top: 1px dashed var(--line); vertical-align: top; }
   table.breakdown td.amt { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -284,6 +292,11 @@
           <button class="small" id="btnNextMonth">来月末権利</button>
         </div>
       </div>
+      <div class="field">
+        <label for="inYutai">優待の価値(円)<span class="chip opt">任意</span></label>
+        <input id="inYutai" type="number" min="0" step="100" placeholder="例: 3000">
+        <div class="after">入れると各社の利回り(お得額・コスト率)を表示。QUOカード額面や優待品の相当額を(上のみんかぶ/Yahoo!優待で確認)</div>
+      </div>
     </div>
     <div class="preview" id="datePreview"></div>
   </section>
@@ -367,6 +380,7 @@ const DEFAULT_CONFIG = {
       '2026/01/05 日興: 一般(3年)貸株料 1.40%→1.70%、制度買方金利 2.50%→2.97%'
     ],
     tool: [
+      '2026/07/16 「優待の価値(円)」の任意入力欄を追加。入れると各社カードに利回り(お得額=優待価値−コスト、コスト率=コスト÷優待価値)を表示(空欄なら非表示)',
       '2026/07/16 日興の制度買方金利改定(2026/7/21約定分〜3.54%。公式告知2026/7/9)を確認。初期値は現行3.27%のまま、7/20頃に3.54%へ切替予定(一般貸株料1.90%は据え置き)',
       '2026/07/16 入力欄を色分け(黄=手入力が必要/緑=コード入力で自動反映)し凡例を追加/合計と内訳の事務管理費を青で強調(かかる時だけ。0円はグレーのまま)/日程パネルの事務管理費境界を赤表示',
       '2026/07/15 スマホ対応の調整(iOSで入力時に画面が自動ズームされる問題の対策ほか)。Windows・スマホからは Artifact リンクをブラウザで開けばそのまま使える',
@@ -533,7 +547,7 @@ function mergeDeep(base, over) {
 function loadInput() {
   const def = {
     code: '', name: '', price: '', shares: 100, priceNote: '',
-    tate: '', ochi: '',
+    tate: '', ochi: '', yutaiValue: '',
     sellType: {}, buyMethod: {}, premiumPerShare: 0, hyperPerShare: 0
   };
   try {
@@ -905,9 +919,24 @@ function renderCards() {
       const warns = r.warnings.length ? `<div class="warnbox">${r.warnings.map(w => '<div>⚠ ' + esc(w) + '</div>').join('')}</div>` : '';
       const judgeHtml = r.judge ? `<div class="judgebox">${r.judge.main}${r.judge.sub ? `<span class="sub">${esc(r.judge.sub)}</span>` : ''}</div>` : '';
       const blockedHtml = r.blocked ? `<div class="blockedbox">🚫 ${esc(r.blocked)}</div>` : '';
+      // 利回り: 優待価値を入れた人にだけ「お得額(優待価値−コスト)」「コスト率(コスト÷優待価値)」を表示
+      const yutai = Number(inputState.yutaiValue) || 0;
+      let yieldHtml = '';
+      if (yutai > 0 && !r.blocked) {
+        const gain = yutai - r.total;
+        const gainCls = gain >= 0 ? 'gain' : 'loss';
+        const sign = gain >= 0 ? '+' : '−';
+        const costRate = r.total / yutai * 100;
+        yieldHtml = `
+        <div class="yield">
+          <span class="yield-item"><span class="yl">お得額(優待${fmtYen(yutai)}円−コスト)</span><b class="yv ${gainCls}">${sign}${fmtYen(Math.abs(gain))}円</b></span>
+          <span class="yield-item"><span class="yl">コスト率(優待価値比)</span><b class="yv">${costRate.toFixed(1)}%</b></span>
+        </div>`;
+      }
       body = `
         ${judgeHtml}${blockedHtml}
         <div class="total"><span class="num">${fmtYen(r.total)}</span><span class="unit">円</span>${r.blocked ? '<span class="badge-blocked">建不可</span>' : ''}</div>
+        ${yieldHtml}
         <table class="breakdown">${rows}</table>
         ${warns}`;
     }
@@ -1385,6 +1414,7 @@ function init() {
   bindInput('inShares', 'shares');
   bindInput('inTate', 'tate');
   bindInput('inOchi', 'ochi');
+  bindInput('inYutai', 'yutaiValue');
 
   document.getElementById('btnThisMonth').addEventListener('click', () => setOchiFromMonthEnd(0));
   document.getElementById('btnNextMonth').addEventListener('click', () => setOchiFromMonthEnd(1));
@@ -1408,6 +1438,7 @@ function init() {
     document.getElementById('inName').value = '';
     document.getElementById('inPrice').value = '';
     document.getElementById('inShares').value = inputState.shares;
+    document.getElementById('inYutai').value = '';
     document.getElementById('priceStatus').textContent = PRICE_STATUS_DEFAULT;
     const now = new Date();
     const sch = monthEndSchedule(now.getFullYear(), now.getMonth() + 1);
