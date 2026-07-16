@@ -387,6 +387,7 @@ const DEFAULT_CONFIG = {
       '2026/01/05 日興: 一般(3年)貸株料 1.40%→1.70%、制度買方金利 2.50%→2.97%'
     ],
     tool: [
+      '2026/07/16 遠い権利(来月末など)で約定日の初期値が1ヶ月以上前になり事務管理費が無駄に出て境界案内が隠れていたのを、管理費が出ない範囲(権利落ちの約1ヶ月前より後)に初期値を自動調整。あわせてSBI短期など返済期限1ヶ月未満の区分で管理費が誤計上されていた不具合を修正(常に0)',
       '2026/07/16 事務管理費の発生境界日に「目安・正確な起算日は各社で要確認」を明記(約定日/受渡日の起算や「1ヶ月ちょうど」の扱いで境界ちょうどの日は1日ずれうるため。通常のクロスなら影響なし)',
       '2026/07/16 事務管理費の発生境界(赤)は「1ヶ月超の保有がありうる区分」だけに表示。短期・HYPERは返済期限が1ヶ月未満で構造的に発生しないため、その旨をグレーで表示(SBIフライング/短期クロス等では境界の赤表示は出ない)',
       '2026/07/16 日程パネルを共通項目だけに整理し、証券会社別のクロス日程(SBIフライング/通常・楽天無期限の最終日)は各社カードに集約。事務管理費の発生境界日を各カードの内訳に赤字で表示。楽天も事務管理費あり(1ヶ月経過ごと・公式で確認)を反映',
@@ -834,20 +835,23 @@ function calcBroker(key) {
   // --- 事務管理費 ---
   const ad = adminFee(b, tate, ochi, shares);
   if (b.admin) {
-    // 短期・HYPERは返済期限が1ヶ月未満 → 建玉が1ヶ月を跨げず事務管理費は構造的に発生しない(SBIフライング/短期クロス等)
+    // 短期・HYPERは返済期限が1ヶ月未満 → 建玉が1ヶ月を跨げず事務管理費は構造的に発生しない(SBIフライング/短期クロス等)。
+    // 日付上は1ヶ月超でも短期では実際には建て続けられないため、月数・料金とも0に強制する
     const noAdminByTerm = sellKey === 'tanki' || sellKey === 'hyper';
+    const admMonths = noAdminByTerm ? 0 : ad.months;
+    const admFee = noAdminByTerm ? 0 : ad.fee;
     const admBnd = addMonthsClamped(ochi, -1); // この日以前に建てると建玉が1ヶ月を跨ぎ管理費が発生
     items.push({
-      label: '事務管理費' + (ad.months ? '(' + ad.months + 'ヶ月経過)' : ''),
-      amount: ad.fee,
-      formula: ad.months
-        ? 'min(max(' + fmtNum(shares) + '株×' + b.admin.perShare + '円, ' + b.admin.min + '円), ' + fmtNum(b.admin.max) + '円) × ' + ad.months
+      label: '事務管理費' + (admMonths ? '(' + admMonths + 'ヶ月経過)' : ''),
+      amount: admFee,
+      formula: admMonths
+        ? 'min(max(' + fmtNum(shares) + '株×' + b.admin.perShare + '円, ' + b.admin.min + '円), ' + fmtNum(b.admin.max) + '円) × ' + admMonths
         : noAdminByTerm
           ? 'この売建区分は返済期限が1ヶ月未満のため発生しない'
           : fmtJP(admBnd) + '頃以前の建てで発生(目安・建玉1ヶ月以内なら0円。正確な起算日は各社で要確認)',
-      boundary: !ad.months && !noAdminByTerm  // 赤の境界案内は、1ヶ月超の保有がありうる区分のときだけ
+      boundary: !admMonths && !noAdminByTerm  // 赤の境界案内は、1ヶ月超の保有がありうる区分のときだけ
     });
-    if (ad.months > 0 && b.admin.note) warnings.push('事務管理費: ' + b.admin.note + '。');
+    if (admMonths > 0 && b.admin.note) warnings.push('事務管理費: ' + b.admin.note + '。');
   } else {
     items.push({ label: '事務管理費', amount: 0, formula: 'この会社は管理費なし(公式明記)' });
   }
@@ -1417,11 +1421,14 @@ function applyKenriSchedule(sch) {
   document.getElementById('inOchi').value = inputState.ochi;
   // 約定日が未入力 or 権利落ち日より後なら、直近の約定可能日(15:30以降は翌営業日)に合わせる
   const set = holidaySet();
+  const earliest = defaultTateDate(set);                                // いま発注して約定できる最早日(15:30境界)
+  const noAdminFrom = nextBizDay(addMonthsClamped(sch.ochi, -1), set);   // これ以降に建てれば建玉が1ヶ月を跨がず事務管理費が発生しない
   let t = inputState.tate ? parseYMD(inputState.tate) : null;
-  // 未入力 / 権利落ち日より後 / 「今から発注できる最早日」より前(15:30以降は当日約定不可) のいずれかなら建て直す
-  if (!t || t > sch.ochi || t < defaultTateDate(set)) {
-    let d = defaultTateDate(set);
-    if (d > sch.last) d = sch.last; // 権利付最終日を超えない
+  // 未入力 / 権利落ち日より後 / 最早約定日より前 / 事務管理費が無駄に出るほど早い(遠い権利で今日建てる等) のいずれかなら建て直す
+  if (!t || t > sch.ochi || t < earliest || t < noAdminFrom) {
+    let d = earliest;
+    if (d < noAdminFrom) d = noAdminFrom; // 事務管理費が発生しない範囲まで後ろ倒し(遠い権利の初期値が1ヶ月超にならないように)
+    if (d > sch.last) d = sch.last;       // ただし権利付最終日は超えない
     inputState.tate = toYMD(d);
     document.getElementById('inTate').value = inputState.tate;
   }
