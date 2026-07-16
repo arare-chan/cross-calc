@@ -387,6 +387,7 @@ const DEFAULT_CONFIG = {
       '2026/01/05 日興: 一般(3年)貸株料 1.40%→1.70%、制度買方金利 2.50%→2.97%'
     ],
     tool: [
+      '2026/07/16 事務管理費の発生境界(赤)は「1ヶ月超の保有がありうる区分」だけに表示。短期・HYPERは返済期限が1ヶ月未満で構造的に発生しないため、その旨をグレーで表示(SBIフライング/短期クロス等では境界の赤表示は出ない)',
       '2026/07/16 日程パネルを共通項目だけに整理し、証券会社別のクロス日程(SBIフライング/通常・楽天無期限の最終日)は各社カードに集約。事務管理費の発生境界日を各カードの内訳に赤字で表示。楽天も事務管理費あり(1ヶ月経過ごと・公式で確認)を反映',
       '2026/07/16 約定日の初期値を修正: 15:30以降に開くと当日約定のままだったのを、翌営業日(=いま発注して約定できる最早日)に繰り上げるように',
       '2026/07/16 「優待の価値(円)」の任意入力欄を追加 → 優待利回り(優待価値÷約定代金)を欄の下に、各社カードにお得額(優待価値−コスト)とコスト率(コスト÷優待価値。20%以下が目安=緑・超えたら警告色。目安は⚙で変更可)を表示(空欄なら非表示)',
@@ -832,12 +833,18 @@ function calcBroker(key) {
   // --- 事務管理費 ---
   const ad = adminFee(b, tate, ochi, shares);
   if (b.admin) {
+    // 短期・HYPERは返済期限が1ヶ月未満 → 建玉が1ヶ月を跨げず事務管理費は構造的に発生しない(SBIフライング/短期クロス等)
+    const noAdminByTerm = sellKey === 'tanki' || sellKey === 'hyper';
     const admBnd = addMonthsClamped(ochi, -1); // この日以前に建てると建玉が1ヶ月を跨ぎ管理費が発生
     items.push({
       label: '事務管理費' + (ad.months ? '(' + ad.months + 'ヶ月経過)' : ''),
       amount: ad.fee,
-      formula: ad.months ? 'min(max(' + fmtNum(shares) + '株×' + b.admin.perShare + '円, ' + b.admin.min + '円), ' + fmtNum(b.admin.max) + '円) × ' + ad.months : fmtJP(admBnd) + ' 以前の建てで発生(建玉1ヶ月以内なら0円)',
-      boundary: !ad.months  // 0円のときの発生境界の案内(赤で注意喚起)
+      formula: ad.months
+        ? 'min(max(' + fmtNum(shares) + '株×' + b.admin.perShare + '円, ' + b.admin.min + '円), ' + fmtNum(b.admin.max) + '円) × ' + ad.months
+        : noAdminByTerm
+          ? 'この売建区分は返済期限が1ヶ月未満のため発生しない'
+          : fmtJP(admBnd) + ' 以前の建てで発生(建玉1ヶ月以内なら0円)',
+      boundary: !ad.months && !noAdminByTerm  // 赤の境界案内は、1ヶ月超の保有がありうる区分のときだけ
     });
     if (ad.months > 0 && b.admin.note) warnings.push('事務管理費: ' + b.admin.note + '。');
   } else {
