@@ -151,6 +151,8 @@
   .yield .yv { font-size: 16px; font-weight: 700; }
   .yield .yv.gain { color: var(--good); }
   .yield .yv.loss { color: var(--danger); }
+  #outYutaiYield { color: var(--accent); font-weight: 700; }
+  #outYutaiYield .sub { color: var(--sub); font-weight: 400; margin-left: 4px; }
   table.breakdown { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: auto; }
   table.breakdown td { padding: 4px 0; border-top: 1px dashed var(--line); vertical-align: top; }
   table.breakdown td.amt { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -295,7 +297,7 @@
       <div class="field">
         <label for="inYutai">優待の価値(円)<span class="chip opt">任意</span></label>
         <input id="inYutai" type="number" min="0" step="100" placeholder="例: 3000">
-        <div class="after">入れると各社の利回り(お得額・コスト率)を表示。QUOカード額面や優待品の相当額を(上のみんかぶ/Yahoo!優待で確認)</div>
+        <div class="after"><b id="outYutaiYield" style="display:none"></b><span id="yutaiHint">入れると優待利回りと各社のお得額を表示。QUOカード額面や優待品の相当額を(上のみんかぶ/Yahoo!優待で確認)</span></div>
       </div>
     </div>
     <div class="preview" id="datePreview"></div>
@@ -380,7 +382,8 @@ const DEFAULT_CONFIG = {
       '2026/01/05 日興: 一般(3年)貸株料 1.40%→1.70%、制度買方金利 2.50%→2.97%'
     ],
     tool: [
-      '2026/07/16 「優待の価値(円)」の任意入力欄を追加。入れると各社カードに利回り(お得額=優待価値−コスト、コスト率=コスト÷優待価値)を表示(空欄なら非表示)',
+      '2026/07/16 約定日の初期値を修正: 15:30以降に開くと当日約定のままだったのを、翌営業日(=いま発注して約定できる最早日)に繰り上げるように',
+      '2026/07/16 「優待の価値(円)」の任意入力欄を追加 → 優待利回り(優待価値÷約定代金)を欄の下に表示、各社カードにお得額(優待価値−コスト)を表示(空欄なら非表示)',
       '2026/07/16 日興の制度買方金利改定(2026/7/21約定分〜3.54%。公式告知2026/7/9)を確認。初期値は現行3.27%のまま、7/20頃に3.54%へ切替予定(一般貸株料1.90%は据え置き)',
       '2026/07/16 入力欄を色分け(黄=手入力が必要/緑=コード入力で自動反映)し凡例を追加/合計と内訳の事務管理費を青で強調(かかる時だけ。0円はグレーのまま)/日程パネルの事務管理費境界を赤表示',
       '2026/07/15 スマホ対応の調整(iOSで入力時に画面が自動ズームされる問題の対策ほか)。Windows・スマホからは Artifact リンクをブラウザで開けばそのまま使える',
@@ -926,11 +929,9 @@ function renderCards() {
         const gain = yutai - r.total;
         const gainCls = gain >= 0 ? 'gain' : 'loss';
         const sign = gain >= 0 ? '+' : '−';
-        const costRate = r.total / yutai * 100;
         yieldHtml = `
         <div class="yield">
-          <span class="yield-item"><span class="yl">お得額(優待${fmtYen(yutai)}円−コスト)</span><b class="yv ${gainCls}">${sign}${fmtYen(Math.abs(gain))}円</b></span>
-          <span class="yield-item"><span class="yl">コスト率(優待価値比)</span><b class="yv">${costRate.toFixed(1)}%</b></span>
+          <span class="yield-item"><span class="yl">お得額(優待${fmtYen(yutai)}円 − コスト)</span><b class="yv ${gainCls}">${sign}${fmtYen(Math.abs(gain))}円</b></span>
         </div>`;
       }
       body = `
@@ -1046,7 +1047,20 @@ function renderPreview() {
 
 function renderAmount() {
   const p = Number(inputState.price), s = Number(inputState.shares);
-  document.getElementById('outAmount').textContent = (p && s) ? fmtYen(Math.round(p * s)) + ' 円' : '—';
+  const amount = (p && s) ? Math.round(p * s) : 0;
+  document.getElementById('outAmount').textContent = amount ? fmtYen(amount) + ' 円' : '—';
+  // 優待利回り(対約定代金) = 優待価値 ÷ 約定代金。会社によらず同じなので優待価値欄の直下に表示
+  const yutai = Number(inputState.yutaiValue) || 0;
+  const y = document.getElementById('outYutaiYield');
+  const hint = document.getElementById('yutaiHint');
+  if (yutai > 0 && amount > 0) {
+    y.innerHTML = '優待利回り ' + (yutai / amount * 100).toFixed(2) + '%<span class="sub">(優待' + fmtYen(yutai) + '円 ÷ 約定代金' + fmtYen(amount) + '円)</span>';
+    y.style.display = '';
+    hint.style.display = 'none';
+  } else {
+    y.style.display = 'none';
+    hint.style.display = '';
+  }
 }
 
 function renderLinks() {
@@ -1390,7 +1404,8 @@ function applyKenriSchedule(sch) {
   // 約定日が未入力 or 権利落ち日より後なら、直近の約定可能日(15:30以降は翌営業日)に合わせる
   const set = holidaySet();
   let t = inputState.tate ? parseYMD(inputState.tate) : null;
-  if (!t || t > sch.ochi) {
+  // 未入力 / 権利落ち日より後 / 「今から発注できる最早日」より前(15:30以降は当日約定不可) のいずれかなら建て直す
+  if (!t || t > sch.ochi || t < defaultTateDate(set)) {
     let d = defaultTateDate(set);
     if (d > sch.last) d = sch.last; // 権利付最終日を超えない
     inputState.tate = toYMD(d);
@@ -1474,6 +1489,16 @@ function init() {
     const sch = monthEndSchedule(now.getFullYear(), now.getMonth() + 1);
     setOchiFromMonthEnd(defaultTateDate(holidaySet()) > sch.last ? 1 : 0);
   } else {
+    // 保存済みの約定日が「今から発注できる最早日」より前(例: 15:30以降に開くと当日はもう約定不可)なら繰り上げる
+    const set = holidaySet();
+    const earliest = defaultTateDate(set);
+    if (inputState.tate && parseYMD(inputState.tate) < earliest) {
+      const ochiD = parseYMD(inputState.ochi);
+      const d = earliest > ochiD ? ochiD : earliest;
+      inputState.tate = toYMD(d);
+      document.getElementById('inTate').value = inputState.tate;
+      saveInput();
+    }
     renderAll();
   }
 }
