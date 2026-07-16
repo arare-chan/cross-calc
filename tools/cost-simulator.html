@@ -387,6 +387,7 @@ const DEFAULT_CONFIG = {
       '2026/01/05 日興: 一般(3年)貸株料 1.40%→1.70%、制度買方金利 2.50%→2.97%'
     ],
     tool: [
+      '2026/07/16 事務管理費が発生している場合に「◯/◯頃以降に建てれば0円(目安)」の回避日も表示(発生していない時の境界案内と対になる情報)',
       '2026/07/16 遠い権利(来月末など)で約定日の初期値が1ヶ月以上前になり事務管理費が無駄に出て境界案内が隠れていたのを、管理費が出ない範囲(権利落ちの約1ヶ月前より後)に初期値を自動調整。あわせてSBI短期など返済期限1ヶ月未満の区分で管理費が誤計上されていた不具合を修正(常に0)',
       '2026/07/16 事務管理費の発生境界日に「目安・正確な起算日は各社で要確認」を明記(約定日/受渡日の起算や「1ヶ月ちょうど」の扱いで境界ちょうどの日は1日ずれうるため。通常のクロスなら影響なし)',
       '2026/07/16 事務管理費の発生境界(赤)は「1ヶ月超の保有がありうる区分」だけに表示。短期・HYPERは返済期限が1ヶ月未満で構造的に発生しないため、その旨をグレーで表示(SBIフライング/短期クロス等では境界の赤表示は出ない)',
@@ -840,12 +841,13 @@ function calcBroker(key) {
     const noAdminByTerm = sellKey === 'tanki' || sellKey === 'hyper';
     const admMonths = noAdminByTerm ? 0 : ad.months;
     const admFee = noAdminByTerm ? 0 : ad.fee;
-    const admBnd = addMonthsClamped(ochi, -1); // この日以前に建てると建玉が1ヶ月を跨ぎ管理費が発生
+    const admBnd = addMonthsClamped(ochi, -1);          // この日以前に建てると建玉が1ヶ月を跨ぎ管理費が発生
+    const admSafeFrom = nextBizDay(admBnd, set);         // この日以降に建てれば管理費0円(目安)
     items.push({
       label: '事務管理費' + (admMonths ? '(' + admMonths + 'ヶ月経過)' : ''),
       amount: admFee,
       formula: admMonths
-        ? 'min(max(' + fmtNum(shares) + '株×' + b.admin.perShare + '円, ' + b.admin.min + '円), ' + fmtNum(b.admin.max) + '円) × ' + admMonths
+        ? 'min(max(' + fmtNum(shares) + '株×' + b.admin.perShare + '円, ' + b.admin.min + '円), ' + fmtNum(b.admin.max) + '円) × ' + admMonths + '。' + fmtJP(admSafeFrom) + '頃以降に建てれば0円(目安)'
         : noAdminByTerm
           ? 'この売建区分は返済期限が1ヶ月未満のため発生しない'
           : fmtJP(admBnd) + '頃以前の建てで発生(目安・建玉1ヶ月以内なら0円。正確な起算日は各社で要確認)',
