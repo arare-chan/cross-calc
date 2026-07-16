@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>優待クロス コスト計算シミュレーター</title>
+<title>優待クロス シュミレーター</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><g fill='%230f5fa8'><ellipse cx='50' cy='64' rx='23' ry='19'/><ellipse cx='22' cy='40' rx='9' ry='12'/><ellipse cx='41' cy='26' rx='9' ry='13'/><ellipse cx='59' cy='26' rx='9' ry='13'/><ellipse cx='78' cy='40' rx='9' ry='12'/></g></svg>">
 <style>
   :root {
     --bg: #f4f6f9;
@@ -54,7 +55,7 @@
   .wrap { max-width: 1160px; margin: 0 auto; padding: 20px 16px 60px; }
 
   header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
-  header h1 { font-size: 20px; margin: 0; }
+  header h1 { font-size: 20px; margin: 0; display: flex; align-items: center; gap: 9px; }
   header .survey { color: var(--sub); font-size: 12px; }
   header .spacer { flex: 1; }
   button {
@@ -131,6 +132,29 @@
     background: var(--good); color: #fff; font-size: 11px; font-weight: 600;
     padding: 1px 10px; border-radius: 999px;
   }
+  /* 猫モチーフの装飾(猫アイコン・足跡)。実用のじゃまにならない上品なアクセント */
+  .brandpaws { display: inline-flex; align-items: flex-end; gap: 2px; color: var(--accent); flex: none; }
+  .brandpaws .bp { width: 16px; height: 16px; fill: currentColor; }
+  .brandpaws .bp1 { transform: rotate(-18deg) translateY(-3px); }
+  .brandpaws .bp2 { transform: rotate(12deg); }
+  .badge-cheapest .pawbadge { width: 11px; height: 11px; fill: currentColor; vertical-align: -1px; margin-right: 4px; }
+  .card.cheapest { isolation: isolate; }
+  .card.cheapest .pawmark {
+    position: absolute; right: 10px; bottom: 8px; width: 62px; height: 62px;
+    fill: var(--good); opacity: .16; pointer-events: none; z-index: 1;
+    transform: rotate(-12deg);  /* 前面に薄く=足跡スタンプ風。オレンジ枠の裏に隠れない */
+  }
+  /* お得な時のごほうび: コスト率が目安の半分以下なら足跡スタンプがポンと出る */
+  .pawstamp {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 700; color: var(--good);
+    background: var(--good-bg); border: 1px solid var(--good); border-radius: 999px;
+    padding: 1px 9px; margin-left: 2px; align-self: center;
+    animation: pawpop .35s cubic-bezier(.34,1.56,.64,1) both;
+  }
+  .pawstamp .pawmini { width: 12px; height: 12px; fill: currentColor; }
+  @keyframes pawpop { from { transform: scale(.5) rotate(-8deg); opacity: 0; } to { transform: scale(1) rotate(0); opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .pawstamp { animation: none; } }
   .card h3 { margin: 0 0 2px; font-size: 15px; }
   .card .coursenote { font-size: 11px; color: var(--sub); margin-bottom: 8px; }
   .card .ratenote { font-size: 10.5px; color: var(--warn); margin: -4px 0 8px; }
@@ -237,10 +261,19 @@
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="ico-paw" viewBox="0 0 100 100">
+    <ellipse cx="50" cy="64" rx="23" ry="19"/>
+    <ellipse cx="22" cy="40" rx="9" ry="12"/>
+    <ellipse cx="41" cy="26" rx="9" ry="13"/>
+    <ellipse cx="59" cy="26" rx="9" ry="13"/>
+    <ellipse cx="78" cy="40" rx="9" ry="12"/>
+  </symbol>
+</defs></svg>
 <div class="wrap">
 
   <header>
-    <h1>優待クロス コスト計算シミュレーター</h1>
+    <h1><span class="brandpaws" aria-hidden="true"><svg class="bp bp1"><use href="#ico-paw"/></svg><svg class="bp bp2"><use href="#ico-paw"/></svg></span><span>優待クロス シュミレーター</span></h1>
     <span class="survey">料率初期値: <span id="surveyDate"></span> 調査(manual/ 準拠)</span>
     <span class="spacer"></span>
     <button id="btnSettings">⚙ 料率・祝日の設定</button>
@@ -387,6 +420,7 @@ const DEFAULT_CONFIG = {
       '2026/01/05 日興: 一般(3年)貸株料 1.40%→1.70%、制度買方金利 2.50%→2.97%'
     ],
     tool: [
+      '2026/07/16 デザインに猫モチーフを追加。題名を「優待クロス シュミレーター」に、見出しに足跡2つ、最安バッジと最安カードに足跡、お得な時(コスト率が目安の半分以下)の「激安にゃ!」スタンプ、タブのファビコンも足跡に',
       '2026/07/16 事務管理費が発生している場合に「◯/◯頃以降に建てれば0円(目安)」の回避日も表示(発生していない時の境界案内と対になる情報)',
       '2026/07/16 遠い権利(来月末など)で約定日の初期値が1ヶ月以上前になり事務管理費が無駄に出て境界案内が隠れていたのを、管理費が出ない範囲(権利落ちの約1ヶ月前より後)に初期値を自動調整。あわせてSBI短期など返済期限1ヶ月未満の区分で管理費が誤計上されていた不具合を修正(常に0)',
       '2026/07/16 事務管理費の発生境界日に「目安・正確な起算日は各社で要確認」を明記(約定日/受渡日の起算や「1ヶ月ちょうど」の扱いで境界ちょうどの日は1日ずれうるため。通常のクロスなら影響なし)',
@@ -955,10 +989,15 @@ function renderCards() {
         const costRate = r.total / yutai * 100;
         const guide = Number(config.calc.costRateGuide) || 20;
         const rateCls = costRate <= guide ? 'gain' : 'over';  // 目安以下なら緑=クロス推奨、超えたら警告色
+        // ごほうび: コスト率が目安の半分以下(=かなりお得)なら足跡スタンプ
+        const stamp = (gain >= 0 && costRate <= guide / 2)
+          ? '<span class="pawstamp"><svg class="pawmini"><use href="#ico-paw"/></svg>激安にゃ!</span>'
+          : '';
         yieldHtml = `
         <div class="yield">
           <span class="yield-item"><span class="yl">お得額(優待${fmtYen(yutai)}円 − コスト)</span><b class="yv ${gainCls}">${sign}${fmtYen(Math.abs(gain))}円</b></span>
           <span class="yield-item"><span class="yl">コスト率(${guide}%以下が目安)</span><b class="yv ${rateCls}">${costRate.toFixed(1)}%</b></span>
+          ${stamp}
         </div>`;
       }
       body = `
@@ -971,7 +1010,7 @@ function renderCards() {
 
     return `
       <div class="card ${cheapest ? 'cheapest' : ''}${r && r.blocked ? ' blocked' : ''}" data-broker="${key}">
-        ${cheapest ? '<span class="badge-cheapest">最安</span>' : ''}
+        ${cheapest ? '<span class="badge-cheapest"><svg class="pawbadge"><use href="#ico-paw"/></svg>最安</span><svg class="pawmark"><use href="#ico-paw"/></svg>' : ''}
         <h3>${esc(b.name)}</h3>
         <div class="coursenote">${esc(b.courseNote)}</div>
         ${b.rateNote ? `<div class="ratenote">📌 ${esc(b.rateNote)}</div>` : ''}
