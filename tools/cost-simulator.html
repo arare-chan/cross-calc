@@ -161,6 +161,9 @@
   table.breakdown tr.zero td { color: var(--zero); }
   /* 内訳の強調: 事務管理費=青(額が発生した行だけ。0円行は上のグレー)。合計と同じ青で目立たせる */
   table.breakdown tr.fee-admin td { color: var(--accent); font-weight: 600; }
+  /* 事務管理費の発生境界(0円時の案内): 行はグレー、境界日の一文だけ赤で注意喚起 */
+  table.breakdown tr.fee-boundary td { color: var(--zero); }
+  table.breakdown tr.fee-boundary .formula { color: var(--danger); font-weight: 600; }
   .warnbox { margin-top: 8px; font-size: 11.5px; color: var(--warn); background: var(--warn-bg); border-radius: 7px; padding: 6px 9px; }
   .warnbox div + div { margin-top: 3px; }
 
@@ -384,6 +387,7 @@ const DEFAULT_CONFIG = {
       '2026/01/05 日興: 一般(3年)貸株料 1.40%→1.70%、制度買方金利 2.50%→2.97%'
     ],
     tool: [
+      '2026/07/16 日程パネルを共通項目だけに整理し、証券会社別のクロス日程(SBIフライング/通常・楽天無期限の最終日)は各社カードに集約。事務管理費の発生境界日を各カードの内訳に赤字で表示。楽天も事務管理費あり(1ヶ月経過ごと・公式で確認)を反映',
       '2026/07/16 約定日の初期値を修正: 15:30以降に開くと当日約定のままだったのを、翌営業日(=いま発注して約定できる最早日)に繰り上げるように',
       '2026/07/16 「優待の価値(円)」の任意入力欄を追加 → 優待利回り(優待価値÷約定代金)を欄の下に、各社カードにお得額(優待価値−コスト)とコスト率(コスト÷優待価値。20%以下が目安=緑・超えたら警告色。目安は⚙で変更可)を表示(空欄なら非表示)',
       '2026/07/16 日興の制度買方金利改定(2026/7/21約定分〜3.54%。公式告知2026/7/9)を確認。初期値は現行3.27%のまま、7/20頃に3.54%へ切替予定(一般貸株料1.90%は据え置き)',
@@ -458,7 +462,7 @@ const DEFAULT_CONFIG = {
       buyInterest: 2.80,        // 制度信用買方金利 %(大口優遇なら 2.28)
       marginFee: 0,
       physical: 'free',         // 現物手数料 0円
-      admin: { perShare: 0.11, min: 110, max: 1100, note: 'manual未記載のため一般的な標準額。要公式確認' },
+      admin: { perShare: 0.11, min: 110, max: 1100, note: '新規建約定日から1ヶ月経過ごと(2026-07-16 楽天公式で確認)' },
       defaultBuy: 'physical',
       sellLimits: { tanki: { type: 'calendar14', note: '返済期限: 建日から起算して14日目の前営業日' } }
     },
@@ -828,10 +832,12 @@ function calcBroker(key) {
   // --- 事務管理費 ---
   const ad = adminFee(b, tate, ochi, shares);
   if (b.admin) {
+    const admBnd = addMonthsClamped(ochi, -1); // この日以前に建てると建玉が1ヶ月を跨ぎ管理費が発生
     items.push({
       label: '事務管理費' + (ad.months ? '(' + ad.months + 'ヶ月経過)' : ''),
       amount: ad.fee,
-      formula: ad.months ? 'min(max(' + fmtNum(shares) + '株×' + b.admin.perShare + '円, ' + b.admin.min + '円), ' + fmtNum(b.admin.max) + '円) × ' + ad.months : '建玉1ヶ月以内なら0円'
+      formula: ad.months ? 'min(max(' + fmtNum(shares) + '株×' + b.admin.perShare + '円, ' + b.admin.min + '円), ' + fmtNum(b.admin.max) + '円) × ' + ad.months : fmtJP(admBnd) + ' 以前の建てで発生(建玉1ヶ月以内なら0円)',
+      boundary: !ad.months  // 0円のときの発生境界の案内(赤で注意喚起)
     });
     if (ad.months > 0 && b.admin.note) warnings.push('事務管理費: ' + b.admin.note + '。');
   } else {
@@ -914,7 +920,8 @@ function renderCards() {
       body = '<div class="total"><span class="num" style="color:var(--zero)">—</span></div><div style="font-size:12px;color:var(--sub)">株価・株数・日付を入力してください</div>';
     } else {
       // 内訳の色分け: 0円はグレー、事務管理費は青(額が発生した行だけ。合計と同じ青で強調)
-      const rowClass = it => it.amount === 0 ? 'zero'
+      const rowClass = it => it.boundary ? 'fee-boundary'
+        : it.amount === 0 ? 'zero'
         : it.label.startsWith('事務管理費') ? 'fee-admin' : '';
       const rows = r.items.map(it => `
         <tr class="${rowClass(it)}">
@@ -1032,18 +1039,10 @@ function renderPreview() {
     if (days < 1) days = 1;
     items.push({ label: '貸株料の日数(受渡日ベース' + (config.calc.countMethod === 'bothEnds' ? '・両端入れ' : '') + ')', value: days + '日' });
   }
-  // クロスの要日程(権利落ち日だけで決まる): SBI短期の開始(フライング/通常)・楽天無期限の期限・品貸日数・事務管理費の境界
+  // 制度信用売りの逆日歩日数(権利落ち日だけで決まる・全社共通)。会社別のクロス日程(SBIフライング/通常・楽天無期限の最終日・事務管理費の境界)は各社カードへ集約した
   if (o && !isMarketHoliday(o, set)) {
-    const sStart = sbiTankiStartDate(o, set);
-    const sFly = prevBizDay(sStart, set);
-    items.push({ label: 'SBIフライング注文(裏技・建て日は翌営業日)', value: fmtJP(prevBizDay(sFly, set)) + ' 19:00〜', hot: true });
-    items.push({ label: 'SBI通常の注文開始(約定は ' + fmtJP(sStart) + ' 〜)', value: fmtJP(sFly) + ' 19:00〜', hot: true });
-    const rStart = rakutenTankiStartDate(o, set);
-    items.push({ label: '楽天 無期限で建てられる最終日(目安)', value: fmtJP(prevBizDay(rStart, set)) + ' 15:30まで', hot: true });
     const hLast = prevBizDay(o, set);
     items.push({ label: '品貸日数(制度売りの逆日歩日数・権利付最終日1泊)', value: calDays(addBizDays(hLast, 2, set), addBizDays(o, 2, set)) + '日' });
-    const bnd = addMonthsClamped(o, -1);
-    items.push({ label: '事務管理費(楽天/SBI/イースマ・月110円〜)', value: fmtJP(bnd) + ' 以前の建てで発生', hot: true });
   }
   const html =
     errs.map(e => '<span class="err">⚠ ' + esc(e) + '</span>').join('') +
