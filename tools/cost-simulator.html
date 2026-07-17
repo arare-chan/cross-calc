@@ -420,6 +420,7 @@ const DEFAULT_CONFIG = {
       '2026/01/05 日興: 一般(3年)貸株料 1.40%→1.70%、制度買方金利 2.50%→2.97%'
     ],
     tool: [
+      '2026/07/17 事務管理費の判定を修正。約定日基準で「現渡しが建て日の1ヶ月後の応当日ちょうど」までなら発生しない(判定を<=から<に)。1ヶ月ちょうどのクロス(例:権利落ち8/28なら7/28建て)が誤って課金されていたのを0円に是正。表示も「◯/◯以降の建てなら0円」に統一し、初期約定日もその境界に合わせた',
       '2026/07/17 日興の制度買方金利の初期値を3.54%に切替(2026/7/21約定分〜の改定を反映。7/17大引け後の注文は7/21約定=新料率のため。予約実行が動かなかったため手動反映)',
       '2026/07/16 デザインに猫モチーフを追加。題名を「優待クロス シミュレーター」に、見出しに足跡2つ、最安バッジと最安カードに足跡、お得な時(コスト率が目安の半分以下)の「激安にゃ!」スタンプ、タブのファビコンも足跡に',
       '2026/07/16 事務管理費が発生している場合に「◯/◯頃以降に建てれば0円(目安)」の回避日も表示(発生していない時の境界案内と対になる情報)',
@@ -744,7 +745,9 @@ function adminFee(broker, tate, ochi, shares) {
   if (!broker.admin) return { months: 0, fee: 0 };
   let months = 0;
   let d = addMonthsClamped(tate, 1);
-  while (d <= ochi) { months++; d = addMonthsClamped(d, 1); }
+  // 約定日基準で「1ヶ月目ごとの応当日を(過ぎるたび)」課金。現渡し(ochi=約定日)が応当日ちょうどなら
+  // 「まだ経過していない」= 無料なので、< で比較(<= だと1ヶ月ちょうどのクロスを1日分過大計上する)
+  while (d < ochi) { months++; d = addMonthsClamped(d, 1); }
   if (months === 0) return { months: 0, fee: 0 };
   const per = Math.min(Math.max(shares * broker.admin.perShare, broker.admin.min), broker.admin.max);
   return { months, fee: roundYen(per * months) };
@@ -876,16 +879,17 @@ function calcBroker(key) {
     const noAdminByTerm = sellKey === 'tanki' || sellKey === 'hyper';
     const admMonths = noAdminByTerm ? 0 : ad.months;
     const admFee = noAdminByTerm ? 0 : ad.fee;
-    const admBnd = addMonthsClamped(ochi, -1);          // この日以前に建てると建玉が1ヶ月を跨ぎ管理費が発生
-    const admSafeFrom = nextBizDay(admBnd, set);         // この日以降に建てれば管理費0円(目安)
+    // 約定日基準。現渡し(約定=権利落ち日)が「建て日の1ヶ月後の応当日」ちょうどまでなら0円。
+    // よって addMonthsClamped(ochi,-1) 以降に建てれば発生しない(この日ちょうどの建ても現渡しが応当日=セーフ)
+    const admSafeFrom = addMonthsClamped(ochi, -1);
     items.push({
       label: '事務管理費' + (admMonths ? '(' + admMonths + 'ヶ月経過)' : ''),
       amount: admFee,
       formula: admMonths
-        ? 'min(max(' + fmtNum(shares) + '株×' + b.admin.perShare + '円, ' + b.admin.min + '円), ' + fmtNum(b.admin.max) + '円) × ' + admMonths + '。' + fmtJP(admSafeFrom) + '頃以降に建てれば0円(目安)'
+        ? 'min(max(' + fmtNum(shares) + '株×' + b.admin.perShare + '円, ' + b.admin.min + '円), ' + fmtNum(b.admin.max) + '円) × ' + admMonths + '。' + fmtJP(admSafeFrom) + '以降に建てれば0円(目安)'
         : noAdminByTerm
           ? 'この売建区分は返済期限が1ヶ月未満のため発生しない'
-          : fmtJP(admBnd) + '頃以前の建てで発生(目安・建玉1ヶ月以内なら0円。正確な起算日は各社で要確認)',
+          : fmtJP(admSafeFrom) + '以降の建てなら0円(それより前の建てで発生。約定日基準・目安)',
       boundary: !admMonths && !noAdminByTerm  // 赤の境界案内は、1ヶ月超の保有がありうる区分のときだけ
     });
     if (admMonths > 0 && b.admin.note) warnings.push('事務管理費: ' + b.admin.note + '。');
@@ -1464,7 +1468,9 @@ function applyKenriSchedule(sch) {
   // 約定日が未入力 or 権利落ち日より後なら、直近の約定可能日(15:30以降は翌営業日)に合わせる
   const set = holidaySet();
   const earliest = defaultTateDate(set);                                // いま発注して約定できる最早日(15:30境界)
-  const noAdminFrom = nextBizDay(addMonthsClamped(sch.ochi, -1), set);   // これ以降に建てれば建玉が1ヶ月を跨がず事務管理費が発生しない
+  // これ以降に建てれば事務管理費が発生しない最早日(= 権利落ちの1ヶ月前。現渡しが応当日ちょうど=セーフ)。休場日なら翌営業日
+  let noAdminFrom = addMonthsClamped(sch.ochi, -1);
+  if (isMarketHoliday(noAdminFrom, set)) noAdminFrom = nextBizDay(noAdminFrom, set);
   let t = inputState.tate ? parseYMD(inputState.tate) : null;
   // 未入力 / 権利落ち日より後 / 最早約定日より前 / 事務管理費が無駄に出るほど早い(遠い権利で今日建てる等) のいずれかなら建て直す
   if (!t || t > sch.ochi || t < earliest || t < noAdminFrom) {
