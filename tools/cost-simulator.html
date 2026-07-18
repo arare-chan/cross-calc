@@ -888,10 +888,10 @@ function calcBroker(key) {
       label: '事務管理費' + (admMonths ? '(' + admMonths + 'ヶ月経過)' : ''),
       amount: admFee,
       formula: admMonths
-        ? 'min(max(' + fmtNum(shares) + '株×' + b.admin.perShare + '円, ' + b.admin.min + '円), ' + fmtNum(b.admin.max) + '円) × ' + admMonths + '。' + fmtJP(admSafeFrom) + '以降に建てれば0円(目安)'
+        ? 'min(max(' + fmtNum(shares) + '株×' + b.admin.perShare + '円, ' + b.admin.min + '円), ' + fmtNum(b.admin.max) + '円) × ' + admMonths + '。現渡し(権利付最終日の翌営業日)が建て日の1ヶ月後の応当日を過ぎたため発生。' + fmtJP(admSafeFrom) + '以降に建てれば0円(約定日基準・目安)'
         : noAdminByTerm
           ? 'この売建区分は返済期限が1ヶ月未満のため発生しない'
-          : fmtJP(admSafeFrom) + '以降の建てなら0円(それより前の建てで発生。約定日基準・目安)',
+          : fmtJP(admSafeFrom) + '以降の建てなら0円。現渡し(権利付最終日の翌営業日)が建て日の1ヶ月後の応当日までなら発生しない(約定日基準・目安)',
       boundary: !admMonths && !noAdminByTerm  // 赤の境界案内は、1ヶ月超の保有がありうる区分のときだけ
     });
     if (admMonths > 0 && b.admin.note) warnings.push('事務管理費: ' + b.admin.note + '。');
