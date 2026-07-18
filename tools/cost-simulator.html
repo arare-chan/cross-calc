@@ -881,7 +881,8 @@ function calcBroker(key) {
     const admFee = noAdminByTerm ? 0 : ad.fee;
     // 約定日基準。現渡し(約定=権利落ち日)が「建て日の1ヶ月後の応当日」ちょうどまでなら0円。
     // よって addMonthsClamped(ochi,-1) 以降に建てれば発生しない(この日ちょうどの建ても現渡しが応当日=セーフ)
-    const admSafeFrom = addMonthsClamped(ochi, -1);
+    let admSafeFrom = addMonthsClamped(ochi, -1);
+    if (isMarketHoliday(admSafeFrom, set)) admSafeFrom = nextBizDay(admSafeFrom, set); // 境界が土日祝なら実際に建てられる翌営業日で表示
     items.push({
       label: '事務管理費' + (admMonths ? '(' + admMonths + 'ヶ月経過)' : ''),
       amount: admFee,
