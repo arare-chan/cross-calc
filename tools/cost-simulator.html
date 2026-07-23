@@ -119,6 +119,9 @@
   .preview .placeholder { grid-column: 1 / -1; color: var(--sub); }
 
   .datebtns { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+  .datebtns:empty { display: none; }
+  .datebtns button { padding-inline: 8px; }
+  .field.readonly input { color: var(--ink); font-weight: 700; background: var(--accent-weak); }
 
   .cards { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(255px, 1fr)); }
   .card {
@@ -252,6 +255,7 @@
   .dlg-foot .spacer { flex: 1; }
 
   @media (max-width: 640px) {
+    .grid { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 10px; }
     .total .num { font-size: 27px; }
     /* スマホでの使いやすさ: iOS はフォーム部品が16px未満だとフォーカス時に画面が自動ズームされるため16pxに */
     .field input, .field select, .card .opts select, .card .opts input,
@@ -321,15 +325,14 @@
         <label for="inTate">約定日(クロスを建てる日)</label>
         <input id="inTate" type="date">
       </div>
+      <div class="field readonly">
+        <label for="outLastDate">権利付最終日(この日までに両建て)</label>
+        <input id="outLastDate" type="text" readonly placeholder="権利落ち日から自動計算">
+        <div class="datebtns" id="datePresetBtns"></div>
+      </div>
       <div class="field">
         <label for="inOchi">権利落ち日(現渡しする日)</label>
         <input id="inOchi" type="date">
-        <div class="datebtns">
-          <button class="small" id="btnKenri15">次の15日権利</button>
-          <button class="small" id="btnKenri20">次の20日権利</button>
-          <button class="small" id="btnThisMonth">今月末権利</button>
-          <button class="small" id="btnNextMonth">来月末権利</button>
-        </div>
       </div>
       <div class="field">
         <label for="inYutai">優待の価値(円)<span class="chip opt">任意</span></label>
@@ -421,11 +424,14 @@ const DEFAULT_CONFIG = {
       '2026/01/05 日興: 一般(3年)貸株料 1.40%→1.70%、制度買方金利 2.50%→2.97%'
     ],
     tool: [
-      '2026/07/17 事務管理費の判定を修正。約定日基準で「現渡しが建て日の1ヶ月後の応当日ちょうど」までなら発生しない(判定を<=から<に)。1ヶ月ちょうどのクロス(例:権利落ち8/28なら7/28建て)が誤って課金されていたのを0円に是正。表示も「◯/◯以降の建てなら0円」に統一し、初期約定日もその境界に合わせた',
+      '2026/07/23 権利日程ボタン選択時は入力済みの約定日を過去日でも動かさず、未入力または権利付最終日を過ぎる場合だけ補正するよう再修正',
+      '2026/07/23 権利付最終日を取引条件内で権利落ち日より前に表示し、3ヶ月先までの権利日程ボタンを自動生成(スマホでも詰めて表示)',
+      '2026/07/22 権利落ち日ボタン選択時に、入力済みの有効な約定日を事務管理費0円の境界日へ勝手に後ろ倒ししないよう修正(約定日は当日/15:30以降は翌営業日の初期値を維持)',
+      '2026/07/17 事務管理費の判定を修正。約定日基準で「現渡しが建て日の1ヶ月後の応当日ちょうど」までなら発生しない(判定を<=から<に)。1ヶ月ちょうどのクロス(例:権利落ち8/28なら7/28建て)が誤って課金されていたのを0円に是正。表示も「◯/◯以降の建てなら0円」に統一',
       '2026/07/17 日興の制度買方金利の初期値を3.54%に切替(2026/7/21約定分〜の改定を反映。7/17大引け後の注文は7/21約定=新料率のため。予約実行が動かなかったため手動反映)',
       '2026/07/16 デザインに猫モチーフを追加。題名を「優待クロス シミュレーター」に、見出しに足跡2つ、最安バッジと最安カードに足跡、お得な時(コスト率が目安の半分以下)の「激安にゃ!」スタンプ、タブのファビコンも足跡に',
       '2026/07/16 事務管理費が発生している場合に「◯/◯頃以降に建てれば0円(目安)」の回避日も表示(発生していない時の境界案内と対になる情報)',
-      '2026/07/16 遠い権利(来月末など)で約定日の初期値が1ヶ月以上前になり事務管理費が無駄に出て境界案内が隠れていたのを、管理費が出ない範囲(権利落ちの約1ヶ月前より後)に初期値を自動調整。あわせてSBI短期など返済期限1ヶ月未満の区分で管理費が誤計上されていた不具合を修正(常に0)',
+      '2026/07/16 SBI短期など返済期限1ヶ月未満の区分で管理費が誤計上されていた不具合を修正(常に0)。遠い権利の事務管理費0円境界案内を追加',
       '2026/07/16 事務管理費の発生境界日に「目安・正確な起算日は各社で要確認」を明記(約定日/受渡日の起算や「1ヶ月ちょうど」の扱いで境界ちょうどの日は1日ずれうるため。通常のクロスなら影響なし)',
       '2026/07/16 事務管理費の発生境界(赤)は「1ヶ月超の保有がありうる区分」だけに表示。短期・HYPERは返済期限が1ヶ月未満で構造的に発生しないため、その旨をグレーで表示(SBIフライング/短期クロス等では境界の赤表示は出ない)',
       '2026/07/16 日程パネルを共通項目だけに整理し、証券会社別のクロス日程(SBIフライング/通常・楽天無期限の最終日)は各社カードに集約。事務管理費の発生境界日を各カードの内訳に赤字で表示。楽天も事務管理費あり(1ヶ月経過ごと・公式で確認)を反映',
@@ -718,6 +724,23 @@ function nextKenriSchedule(day) {
     if (sch.last >= earliest) return sch;
   }
   return null;
+}
+
+function presetKenriSchedules(monthsAhead = 3) {
+  const set = holidaySet();
+  const earliest = defaultTateDate(set);
+  const today = new Date();
+  const list = [];
+  for (let k = 0; k <= monthsAhead; k++) {
+    const y = today.getFullYear();
+    const m = today.getMonth() + 1 + k;
+    [['末', 'end'], ['15', 15], ['20', 20]].forEach(([suffix, day]) => {
+      const sch = kenriSchedule(y, m, day);
+      if (sch.last >= earliest) list.push({ label: (sch.base.getMonth() + 1) + (suffix === '末' ? '末' : '/' + suffix), sch });
+    });
+  }
+  list.sort((a, b) => a.sch.last - b.sch.last);
+  return list;
 }
 
 /* ============================ 計算コア ============================ */
@@ -1062,7 +1085,16 @@ function renderCardsKeepFocus(extraKey, rawValue) {
   }
 }
 
+function updateLastDateField() {
+  const el = document.getElementById('outLastDate');
+  if (!el) return;
+  const set = holidaySet();
+  const o = inputState.ochi ? parseYMD(inputState.ochi) : null;
+  el.value = (o && !isMarketHoliday(o, set)) ? fmtJP(prevBizDay(o, set)) : '';
+}
+
 function renderPreview() {
+  updateLastDateField();
   const el = document.getElementById('datePreview');
   const set = holidaySet();
   const items = []; // {label, value}
@@ -1467,18 +1499,16 @@ function bindInput(id, key, after) {
 function applyKenriSchedule(sch) {
   inputState.ochi = toYMD(sch.ochi);
   document.getElementById('inOchi').value = inputState.ochi;
-  // 約定日が未入力 or 権利落ち日より後なら、直近の約定可能日(15:30以降は翌営業日)に合わせる
+  updateLastDateField();
+  // 権利日程ボタンは権利落ち日だけを選ぶためのもの。
+  // 入力済みの約定日は、過去日であってもここでは動かさない
+  // (初期表示時の古い日付補正は init 側でだけ行う)。
+  // 未入力、または選んだ回の権利付最終日を過ぎる場合だけ補正する。
   const set = holidaySet();
-  const earliest = defaultTateDate(set);                                // いま発注して約定できる最早日(15:30境界)
-  // これ以降に建てれば事務管理費が発生しない最早日(= 権利落ちの1ヶ月前。現渡しが応当日ちょうど=セーフ)。休場日なら翌営業日
-  let noAdminFrom = addMonthsClamped(sch.ochi, -1);
-  if (isMarketHoliday(noAdminFrom, set)) noAdminFrom = nextBizDay(noAdminFrom, set);
+  const earliest = defaultTateDate(set); // 約定日が未入力なら使う初期値(15:30境界)
   let t = inputState.tate ? parseYMD(inputState.tate) : null;
-  // 未入力 / 権利落ち日より後 / 最早約定日より前 / 事務管理費が無駄に出るほど早い(遠い権利で今日建てる等) のいずれかなら建て直す
-  if (!t || t > sch.ochi || t < earliest || t < noAdminFrom) {
-    let d = earliest;
-    if (d < noAdminFrom) d = noAdminFrom; // 事務管理費が発生しない範囲まで後ろ倒し(遠い権利の初期値が1ヶ月超にならないように)
-    if (d > sch.last) d = sch.last;       // ただし権利付最終日は超えない
+  if (!t || t > sch.last) {
+    const d = earliest > sch.last ? sch.last : earliest;
     inputState.tate = toYMD(d);
     document.getElementById('inTate').value = inputState.tate;
   }
@@ -1491,6 +1521,21 @@ function setOchiFromMonthEnd(offsetMonth) {
   applyKenriSchedule(kenriSchedule(now.getFullYear(), now.getMonth() + 1 + offsetMonth, 'end'));
 }
 
+function buildDatePresetButtons() {
+  const box = document.getElementById('datePresetBtns');
+  if (!box) return;
+  box.innerHTML = '';
+  presetKenriSchedules(3).forEach(({ label, sch }) => {
+    const btn = document.createElement('button');
+    btn.className = 'small';
+    btn.type = 'button';
+    btn.textContent = label;
+    btn.title = '権利付最終日: ' + fmtJP(sch.last) + ' / 権利落ち日: ' + fmtJP(sch.ochi);
+    btn.addEventListener('click', () => applyKenriSchedule(sch));
+    box.appendChild(btn);
+  });
+}
+
 function init() {
   document.getElementById('surveyDate').textContent = config.surveyDate;
 
@@ -1499,13 +1544,10 @@ function init() {
   bindInput('inPrice', 'price', onPriceTyped);
   bindInput('inShares', 'shares');
   bindInput('inTate', 'tate');
-  bindInput('inOchi', 'ochi');
+  bindInput('inOchi', 'ochi', updateLastDateField);
   bindInput('inYutai', 'yutaiValue');
 
-  document.getElementById('btnThisMonth').addEventListener('click', () => setOchiFromMonthEnd(0));
-  document.getElementById('btnNextMonth').addEventListener('click', () => setOchiFromMonthEnd(1));
-  document.getElementById('btnKenri15').addEventListener('click', () => { const s = nextKenriSchedule(15); if (s) applyKenriSchedule(s); });
-  document.getElementById('btnKenri20').addEventListener('click', () => { const s = nextKenriSchedule(20); if (s) applyKenriSchedule(s); });
+  buildDatePresetButtons();
   document.getElementById('btnFetchPrice').addEventListener('click', fetchPrice);
   document.getElementById('priceStatus').textContent = inputState.priceNote || PRICE_STATUS_DEFAULT;
   if (ARTIFACT_BUILD) { // 配布版は外部取得不可 → 株価も「手入力」扱いの表示にする
