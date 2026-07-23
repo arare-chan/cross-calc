@@ -98,6 +98,7 @@
   .panel h2 { font-size: 14px; margin: 0 0 12px; color: var(--sub); font-weight: 600; letter-spacing: .05em; }
 
   .grid { display: grid; gap: 12px 18px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .field { min-width: 0; }
   .field label { display: block; font-size: 12px; color: var(--sub); margin-bottom: 3px; }
   .field input, .field select {
     width: 100%; font: inherit; padding: 7px 9px;
@@ -141,9 +142,9 @@
   .preview .placeholder { grid-column: 1 / -1; color: var(--sub); }
 
   .datebtns { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+  .datebtns button { min-width: 0; }
   .datebtns:empty { display: none; }
   .datebtns button { padding-inline: 8px; }
-  .field.readonly input { color: var(--ink); font-weight: 700; background: var(--accent-weak); }
 
   .cards { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(255px, 1fr)); }
   .card {
@@ -283,6 +284,8 @@
     .field input, .field select, .card .opts select, .card .opts input,
     .set-field input, .set-field select, .set-field textarea { font-size: 16px; }
     header h1 { font-size: 17px; }
+    .datebtns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .datebtns button { padding-inline: 6px; }
   }
 </style>
 </head>
@@ -347,14 +350,15 @@
         <label for="inTate">約定日(クロスを建てる日)</label>
         <input id="inTate" type="date">
       </div>
-      <div class="field readonly">
-        <label for="outLastDate">権利付最終日(この日までに両建て)</label>
-        <input id="outLastDate" type="text" readonly placeholder="権利落ち日から自動計算">
-        <div class="datebtns" id="datePresetBtns"></div>
+      <div class="field">
+        <label for="inLast">権利付き最終日(この日の大引けまでに両建て)</label>
+        <input id="inLast" type="date">
+        <div class="after">権利落日は翌営業日として自動計算します</div>
       </div>
       <div class="field">
-        <label for="inOchi">権利落ち日(現渡しする日)</label>
-        <input id="inOchi" type="date">
+        <label for="inBase">権利確定日<span class="chip opt">選択用</span></label>
+        <input id="inBase" type="date">
+        <div class="datebtns" id="kenriButtons" aria-label="権利確定日候補"></div>
       </div>
       <div class="field">
         <label for="inYutai">優待の価値(円)<span class="chip opt">任意</span></label>
@@ -625,7 +629,7 @@ function mergeDeep(base, over) {
 function loadInput() {
   const def = {
     code: '', name: '', price: '', shares: 100, priceNote: '',
-    tate: '', ochi: '', yutaiValue: '',
+    tate: '', base: '', last: '', ochi: '', yutaiValue: '',
     sellType: {}, buyMethod: {}, premiumPerShare: 0, hyperPerShare: 0
   };
   try {
@@ -735,34 +739,54 @@ function kenriSchedule(year, month /* 1始まり。12超は翌年に繰上げ */
 }
 function monthEndSchedule(year, month) { return kenriSchedule(year, month, 'end'); }
 
-/* いまから建てて間に合う直近の「day日権利」(15日・20日など)を探す
-   = 権利付最終日が「いま発注して約定できる最早日(15:30以降は翌営業日)」以降の回 */
-function nextKenriSchedule(day) {
-  const set = holidaySet();
-  const earliest = defaultTateDate(set);
-  const today = new Date();
-  for (let k = 0; k < 14; k++) {
-    const sch = kenriSchedule(today.getFullYear(), today.getMonth() + 1 + k, day);
-    if (sch.last >= earliest) return sch;
-  }
-  return null;
+function scheduleFromBaseDate(base, set) {
+  const b = new Date(base);
+  while (isMarketHoliday(b, set)) b.setDate(b.getDate() - 1);
+  let last = b;
+  for (let i = 0; i < 2; i++) last = prevBizDay(last, set);
+  const ochi = nextBizDay(last, set);
+  return { base: b, last, ochi };
+}
+function scheduleFromLastDate(last, set) {
+  const l = new Date(last);
+  const ochi = nextBizDay(l, set);
+  const base = addBizDays(l, 2, set);
+  return { base, last: l, ochi };
 }
 
-function presetKenriSchedules(monthsAhead = 3) {
+/* いまから建てて間に合う直近の「day日権利」(15日・20日など)を探す
+   = 権利付最終日が「いま発注して約定できる最早日(15:30以降は翌営業日)」以降の回 */
+function upcomingKenriChoices(count) {
   const set = holidaySet();
   const earliest = defaultTateDate(set);
   const today = new Date();
-  const list = [];
-  for (let k = 0; k <= monthsAhead; k++) {
-    const y = today.getFullYear();
-    const m = today.getMonth() + 1 + k;
-    [['末', 'end'], ['15', 15], ['20', 20]].forEach(([suffix, day]) => {
-      const sch = kenriSchedule(y, m, day);
-      if (sch.last >= earliest) list.push({ label: (sch.base.getMonth() + 1) + (suffix === '末' ? '末' : '/' + suffix), sch });
-    });
+  const choices = [];
+  const dayDefs = [
+    { day: 15, label: '15日' },
+    { day: 20, label: '20日' },
+    { day: 'end', label: '月末' }
+  ];
+  // 今月を起点に、権利付き最終日を過ぎた候補は自動で落として先の月を補充する。
+  // 15日・20日・月末の3種類×3ヶ月分=9件を常に選べる状態にする。
+  for (let k = 0; choices.length < count && k < 18; k++) {
+    for (const def of dayDefs) {
+      const sch = kenriSchedule(today.getFullYear(), today.getMonth() + 1 + k, def.day);
+      if (sch.last >= earliest) choices.push({ label: (sch.base.getMonth() + 1) + '/' + def.label + '権利', sch });
+      if (choices.length >= count) break;
+    }
   }
-  list.sort((a, b) => a.sch.last - b.sch.last);
-  return list;
+  return choices;
+}
+
+function renderKenriButtons() {
+  const el = document.getElementById('kenriButtons');
+  const choices = upcomingKenriChoices(9);
+  el.innerHTML = choices.map((c, i) =>
+    '<button class="small" type="button" data-kenri="' + i + '" title="権利確定日 ' + fmtJP(c.sch.base) + ' / 権利付き最終日 ' + fmtJP(c.sch.last) + '">' + esc(c.label) + '</button>'
+  ).join('');
+  el.querySelectorAll('[data-kenri]').forEach(btn => {
+    btn.addEventListener('click', () => applyKenriSchedule(choices[Number(btn.dataset.kenri)].sch));
+  });
 }
 
 /* ============================ 計算コア ============================ */
@@ -1107,37 +1131,28 @@ function renderCardsKeepFocus(extraKey, rawValue) {
   }
 }
 
-function updateLastDateField() {
-  const el = document.getElementById('outLastDate');
-  if (!el) return;
-  const set = holidaySet();
-  const o = inputState.ochi ? parseYMD(inputState.ochi) : null;
-  el.value = (o && !isMarketHoliday(o, set)) ? fmtJP(prevBizDay(o, set)) : '';
-}
-
 function renderPreview() {
-  updateLastDateField();
   const el = document.getElementById('datePreview');
   const set = holidaySet();
   const items = []; // {label, value}
   const errs = [];
   const t = inputState.tate ? parseYMD(inputState.tate) : null;
-  const o = inputState.ochi ? parseYMD(inputState.ochi) : null;
+  const last = inputState.last ? parseYMD(inputState.last) : null;
+  const o = inputState.ochi ? parseYMD(inputState.ochi) : (last ? nextBizDay(last, set) : null);
 
-  if (t && o && o < t) {
-    el.innerHTML = '<span class="err">⚠ 権利落ち日が約定日より前になっています</span>';
+  if (t && last && last < t) {
+    el.innerHTML = '<span class="err">⚠ 権利付き最終日が約定日より前になっています</span>';
     return;
   }
   if (t) {
     if (isMarketHoliday(t, set)) errs.push('約定日が休場日です(営業日を指定)');
   }
-  if (o) {
-    if (isMarketHoliday(o, set)) errs.push('権利落ち日が休場日です(営業日を指定)');
+  if (last) {
+    if (isMarketHoliday(last, set)) errs.push('権利付き最終日が休場日です(営業日を指定)');
     else {
-      const last = prevBizDay(o, set);
-      items.push({ label: '権利付最終日(この日の大引けまでに両建て)', value: fmtJP(last) });
+      items.push({ label: '権利落日(現渡しする日)', value: fmtJP(o) });
       if (t && !isMarketHoliday(t, set) && t > last) {
-        errs.push('約定日が権利付最終日(' + fmtJP(last) + ')より後 — この約定日ではこの回の優待の権利は取れない');
+        errs.push('約定日が権利付き最終日(' + fmtJP(last) + ')より後 — この約定日ではこの回の優待の権利は取れない');
       }
     }
   }
@@ -1518,10 +1533,18 @@ function bindInput(id, key, after) {
   });
 }
 
-function applyKenriSchedule(sch) {
+function setDateInputsFromSchedule(sch) {
+  inputState.base = toYMD(sch.base);
+  inputState.last = toYMD(sch.last);
   inputState.ochi = toYMD(sch.ochi);
-  document.getElementById('inOchi').value = inputState.ochi;
-  updateLastDateField();
+  const baseEl = document.getElementById('inBase');
+  const lastEl = document.getElementById('inLast');
+  if (baseEl) baseEl.value = inputState.base;
+  if (lastEl) lastEl.value = inputState.last;
+}
+
+function applyKenriSchedule(sch) {
+  setDateInputsFromSchedule(sch);
   // 権利日程ボタンは権利落ち日だけを選ぶためのもの。
   // 入力済みの約定日は、過去日であってもここでは動かさない
   // (初期表示時の古い日付補正は init 側でだけ行う)。
@@ -1538,38 +1561,48 @@ function applyKenriSchedule(sch) {
   renderAll();
 }
 
+function applyBaseDateInput() {
+  if (!inputState.base) return;
+  const sch = scheduleFromBaseDate(parseYMD(inputState.base), holidaySet());
+  setDateInputsFromSchedule(sch);
+}
+
+function applyLastDateInput() {
+  if (!inputState.last) return;
+  const sch = scheduleFromLastDate(parseYMD(inputState.last), holidaySet());
+  setDateInputsFromSchedule(sch);
+}
+
+function hydrateDateState() {
+  const set = holidaySet();
+  if (inputState.last) {
+    setDateInputsFromSchedule(scheduleFromLastDate(parseYMD(inputState.last), set));
+  } else if (inputState.ochi) {
+    setDateInputsFromSchedule(scheduleFromLastDate(prevBizDay(parseYMD(inputState.ochi), set), set));
+  } else if (inputState.base) {
+    setDateInputsFromSchedule(scheduleFromBaseDate(parseYMD(inputState.base), set));
+  }
+}
+
 function setOchiFromMonthEnd(offsetMonth) {
   const now = new Date();
   applyKenriSchedule(kenriSchedule(now.getFullYear(), now.getMonth() + 1 + offsetMonth, 'end'));
 }
 
-function buildDatePresetButtons() {
-  const box = document.getElementById('datePresetBtns');
-  if (!box) return;
-  box.innerHTML = '';
-  presetKenriSchedules(3).forEach(({ label, sch }) => {
-    const btn = document.createElement('button');
-    btn.className = 'small';
-    btn.type = 'button';
-    btn.textContent = label;
-    btn.title = '権利付最終日: ' + fmtJP(sch.last) + ' / 権利落ち日: ' + fmtJP(sch.ochi);
-    btn.addEventListener('click', () => applyKenriSchedule(sch));
-    box.appendChild(btn);
-  });
-}
-
 function init() {
   document.getElementById('surveyDate').textContent = config.surveyDate;
+  hydrateDateState();
 
   bindInput('inCode', 'code', onCodeChanged);
   bindInput('inName', 'name', onNameTyped);
   bindInput('inPrice', 'price', onPriceTyped);
   bindInput('inShares', 'shares');
   bindInput('inTate', 'tate');
-  bindInput('inOchi', 'ochi', updateLastDateField);
+  bindInput('inLast', 'last', applyLastDateInput);
+  bindInput('inBase', 'base', applyBaseDateInput);
   bindInput('inYutai', 'yutaiValue');
 
-  buildDatePresetButtons();
+  renderKenriButtons();
   document.getElementById('btnFetchPrice').addEventListener('click', fetchPrice);
   document.getElementById('priceStatus').textContent = inputState.priceNote || PRICE_STATUS_DEFAULT;
   if (ARTIFACT_BUILD) { // 配布版は外部取得不可 → 株価も「手入力」扱いの表示にする
@@ -1608,6 +1641,7 @@ function init() {
     try { localStorage.setItem(LS_CONFIG, JSON.stringify(config)); } catch (e) {}
     dlg.close();
     document.getElementById('surveyDate').textContent = config.surveyDate;
+    renderKenriButtons();
     renderAll();
   });
   armTwice(document.getElementById('btnResetSettings'), 'もう一度押すと初期値に戻す', () => {
@@ -1615,11 +1649,12 @@ function init() {
     try { localStorage.removeItem(LS_CONFIG); } catch (e) {}
     buildSettings();
     document.getElementById('surveyDate').textContent = config.surveyDate;
+    renderKenriButtons();
     renderAll();
   });
 
   // 初期日付: 未入力なら「今月末権利」(間に合わなければ来月末)をセット
-  if (!inputState.ochi) {
+  if (!inputState.last) {
     const now = new Date();
     const sch = monthEndSchedule(now.getFullYear(), now.getMonth() + 1);
     setOchiFromMonthEnd(defaultTateDate(holidaySet()) > sch.last ? 1 : 0);
@@ -1628,8 +1663,8 @@ function init() {
     const set = holidaySet();
     const earliest = defaultTateDate(set);
     if (inputState.tate && parseYMD(inputState.tate) < earliest) {
-      const ochiD = parseYMD(inputState.ochi);
-      const d = earliest > ochiD ? ochiD : earliest;
+      const lastD = parseYMD(inputState.last);
+      const d = earliest > lastD ? lastD : earliest;
       inputState.tate = toYMD(d);
       document.getElementById('inTate').value = inputState.tate;
       saveInput();
