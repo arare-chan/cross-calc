@@ -141,7 +141,8 @@
   .preview .err { color: var(--danger); font-weight: 600; grid-column: 1 / -1; }
   .preview .placeholder { grid-column: 1 / -1; color: var(--sub); }
 
-  .datebtns { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+  .datebtns { display: grid; gap: 6px; margin-top: 6px; }
+  .datebtn-month { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
   .datebtns button { min-width: 0; }
   .datebtns:empty { display: none; }
   .datebtns button { padding-inline: 8px; }
@@ -278,13 +279,13 @@
   .dlg-foot .spacer { flex: 1; }
 
   @media (max-width: 640px) {
-    .grid { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 10px; }
+    .grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
     .total .num { font-size: 27px; }
     /* スマホでの使いやすさ: iOS はフォーム部品が16px未満だとフォーカス時に画面が自動ズームされるため16pxに */
     .field input, .field select, .card .opts select, .card .opts input,
     .set-field input, .set-field select, .set-field textarea { font-size: 16px; }
+    .field input[type="date"] { display: block; min-width: 0; max-width: 100%; }
     header h1 { font-size: 17px; }
-    .datebtns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .datebtns button { padding-inline: 6px; }
   }
 </style>
@@ -450,6 +451,7 @@ const DEFAULT_CONFIG = {
       '2026/01/05 日興: 一般(3年)貸株料 1.40%→1.70%、制度買方金利 2.50%→2.97%'
     ],
     tool: [
+      '2026/07/23 スマホの取引条件を1列表示にして日付入力の重なりを解消。権利確定日候補は直近3ヶ月を月ごとの1行・短い表記で表示',
       '2026/07/23 権利日程ボタン選択時は入力済みの約定日を過去日でも動かさず、未入力または権利付最終日を過ぎる場合だけ補正するよう再修正',
       '2026/07/23 権利付最終日を取引条件内で権利落ち日より前に表示し、3ヶ月先までの権利日程ボタンを自動生成(スマホでも詰めて表示)',
       '2026/07/22 権利落ち日ボタン選択時に、入力済みの有効な約定日を事務管理費0円の境界日へ勝手に後ろ倒ししないよう修正(約定日は当日/15:30以降は翌営業日の初期値を維持)',
@@ -754,35 +756,42 @@ function scheduleFromLastDate(last, set) {
   return { base, last: l, ochi };
 }
 
-/* いまから建てて間に合う直近の「day日権利」(15日・20日など)を探す
+/* いまから建てて間に合う直近3ヶ月の「day日権利」(15日・20日など)を月ごとにまとめる
    = 権利付最終日が「いま発注して約定できる最早日(15:30以降は翌営業日)」以降の回 */
-function upcomingKenriChoices(count) {
+function upcomingKenriChoices(monthCount) {
   const set = holidaySet();
   const earliest = defaultTateDate(set);
   const today = new Date();
-  const choices = [];
+  const monthGroups = [];
   const dayDefs = [
-    { day: 15, label: '15日' },
-    { day: 20, label: '20日' },
-    { day: 'end', label: '月末' }
+    { day: 15, label: month => month + '/15' },
+    { day: 20, label: month => month + '/20' },
+    { day: 'end', label: month => month + '月末' }
   ];
-  // 今月を起点に、権利付き最終日を過ぎた候補は自動で落として先の月を補充する。
-  // 15日・20日・月末の3種類×3ヶ月分=9件を常に選べる状態にする。
-  for (let k = 0; choices.length < count && k < 18; k++) {
+  // 今月を起点に、権利付き最終日を過ぎた候補は落とす。
+  // 候補が残る月を3ヶ月分表示し、月をまたいで同じ行に混在させない。
+  for (let k = 0; monthGroups.length < monthCount && k < 18; k++) {
+    const choices = [];
     for (const def of dayDefs) {
       const sch = kenriSchedule(today.getFullYear(), today.getMonth() + 1 + k, def.day);
-      if (sch.last >= earliest) choices.push({ label: (sch.base.getMonth() + 1) + '/' + def.label + '権利', sch });
-      if (choices.length >= count) break;
+      const month = new Date(today.getFullYear(), today.getMonth() + k, 1).getMonth() + 1;
+      if (sch.last >= earliest) choices.push({ label: def.label(month), sch });
     }
+    if (choices.length) monthGroups.push(choices);
   }
-  return choices;
+  return monthGroups;
 }
 
 function renderKenriButtons() {
   const el = document.getElementById('kenriButtons');
-  const choices = upcomingKenriChoices(9);
-  el.innerHTML = choices.map((c, i) =>
-    '<button class="small" type="button" data-kenri="' + i + '" title="権利確定日 ' + fmtJP(c.sch.base) + ' / 権利付き最終日 ' + fmtJP(c.sch.last) + '">' + esc(c.label) + '</button>'
+  const monthGroups = upcomingKenriChoices(3);
+  const choices = monthGroups.flat();
+  let choiceIndex = 0;
+  el.innerHTML = monthGroups.map(monthChoices =>
+    '<div class="datebtn-month">' + monthChoices.map(c => {
+      const i = choiceIndex++;
+      return '<button class="small" type="button" data-kenri="' + i + '" title="権利確定日 ' + fmtJP(c.sch.base) + ' / 権利付き最終日 ' + fmtJP(c.sch.last) + '">' + esc(c.label) + '</button>';
+    }).join('') + '</div>'
   ).join('');
   el.querySelectorAll('[data-kenri]').forEach(btn => {
     btn.addEventListener('click', () => applyKenriSchedule(choices[Number(btn.dataset.kenri)].sch));
