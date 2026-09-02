@@ -92,3 +92,13 @@ nohup.out
 .omc/
 *.local.json
 CLAUDE.local.md
+
+# Sites / Vinext
+node_modules/
+dist/
+.vinext/
+.next/
+.wrangler/
+.env*
+!.env.example
+*.tsbuildinfo

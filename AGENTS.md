@@ -17,7 +17,8 @@
 - `manual/10-glossary.md` — 用語集
 - `manual/11-recovery.md` — 失敗時のリカバリーガイド(事後対処)
 - `slides/yutai-cross-slides.html` — スライド版ビジュアルガイド(単体で開ける self-contained HTML)
-- `tools/cost-simulator.html` — 4社のコスト計算シミュレーター(単体で開ける self-contained HTML)。料率改定時は画面右上の⚙設定パネルか、ファイル内の `DEFAULT_CONFIG` を手直しする(マニュアルの料率更新時はこちらの初期値も忘れずに)
+- `public/calculator.html` — 4社のコスト計算シミュレーター。料率改定時は画面右上の⚙設定パネルか、ファイル内の `DEFAULT_CONFIG` を手直しする(マニュアルの料率更新時はこちらの初期値も忘れずに)
+- `app/api/quote/route.ts` — Sites上で株価を取得する同一オリジンAPI。ブラウザ側へ外部CORS中継を再導入しない
 
 ## 編集ルール
 
@@ -35,10 +36,14 @@ GitHub Issues は、後日対応する作業や複数工程の変更を記録す
 
 このリポジトリは単一コンテキストとして扱う。作業前にルートの `CONTEXT.md` と対象領域の `manual/` を読み、用語と情報源の優先順位を合わせる。詳細は `docs/agents/domain.md` を参照する。
 
+### Release
+
+Sitesへの公開、公開後確認、旧GitHub Pagesの扱いは `docs/agents/release.md` に従う。
+
 ## Git運用
 
 - このリポジトリで変更作業を行うときは、作業用ブランチを作成せず、常に `main` 上で作業する。
 - Pull Request は作成しない。
 - 変更作業は、検証・コミット・`origin/main` への直接 push まで完了して終了とする。
-- push 後は GitHub Pages のデプロイ成功と公開ページの応答を確認してから作業完了とする。
+- push 後はSitesのデプロイ成功と公開ページ・株価APIの応答を確認してから作業完了とする。
 - `origin/main` への直接 push ができない場合は、ブランチ作成や Pull Request で代替せず、push できなかった理由と未完了であることを明示する。

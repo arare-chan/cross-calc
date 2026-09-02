@@ -8,9 +8,10 @@
 
 - `manual/` はリポジトリ内の文章上の正本。質問や編集では該当ページを先に読む。
 - `manual/10-glossary.md` は用語の正本。同じ概念に別名を増やさない。
-- `tools/cost-simulator.html` は計算ツール。料率やルールの変更時は `DEFAULT_CONFIG` を含めてマニュアルと整合させる。
+- `public/calculator.html` は計算ツール。料率やルールの変更時は `DEFAULT_CONFIG` を含めてマニュアルと整合させる。
+- `app/api/quote/route.ts` はSites上の株価取得API。ブラウザからは同一オリジンで呼び、Yahoo Financeへの取得はサーバー側だけで行う。
 - `slides/yutai-cross-slides.html` はマニュアルの要点を伝える派生成果物。大きな数値変更は横断反映する。
-- `index.html` は GitHub Pages の入口。
+- `app/page.tsx` はSites版の入口。公開先はGitHub PagesではなくSitesとする。
 - 料率、手数料、受付時刻、制度ルールの最終的な情報源は各社・取引所・日証金の公式情報。マニュアル末尾の出典を確認する。
 
 ## 基本用語
@@ -32,7 +33,7 @@
 - 制度信用売りを扱う説明では逆日歩リスクを明示する。
 - 変更した数値が比較表、FAQ、スライド、シミュレーターにも存在しないか横断検索する。
 - 公開物を投資助言として表現せず、利益を保証しない。
-- HTML成果物は GitHub Pages から単体で利用できる状態を保つ。
+- 公開前にSites向けのテスト、型検査、ビルド、株価APIの疎通を確認する。
 
 ## コンテキスト境界
 

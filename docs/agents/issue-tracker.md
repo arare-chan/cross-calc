@@ -28,4 +28,4 @@ gh issue close <number> --comment "..."
 
 ## 完了条件
 
-Issue に紐づく作業は、変更の検証、`main` へのコミット、`origin/main` への push、GitHub Pages のデプロイ成功、公開ページの応答確認を終えてから close する。push できない場合やデプロイが失敗した場合は close せず、理由を記録する。
+Issue に紐づく作業は、変更の検証、`main` へのコミット、`origin/main` への push、Sites のデプロイ成功、公開ページと株価APIの応答確認を終えてから close する。push できない場合やデプロイが失敗した場合は close せず、理由を記録する。

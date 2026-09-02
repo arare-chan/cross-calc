@@ -11,7 +11,7 @@
 <meta property="og:locale" content="ja_JP">
 <meta property="og:title" content="優待クロス 手数料シミュレーター（手数料シュミレーター対応）">
 <meta property="og:description" content="優待クロス 手数料を4証券会社で比較。手数料シュミレーター／手数料シュミレーションとして貸株料・金利・事務管理費まで試算できます。">
-<meta property="og:url" content="./cost-simulator.html">
+<meta property="og:url" content="./calculator.html">
 <meta name="twitter:card" content="summary">
 <script type="application/ld+json">
 {
@@ -382,7 +382,7 @@
       <li>手数料無料の前提コース(日興: ダイレクト/楽天: ゼロ/SBI: ゼロ革命+電子交付設定/イースマ: SOR選択)を満たしていること。</li>
       <li>円未満の端数処理は会社により異なるため、実際の請求額と数円ずれることがある。</li>
       <li>料率・祝日は改定されうる。<b>発注前に必ず各社公式サイトで最新料率を確認</b>すること(手直しは右上の⚙から。詳細は manual/ 各社ページ)。</li>
-      <li>株価の「⚡ 自動取得」は Yahoo Finance の遅延データを外部の CORS 中継サービス(corsproxy.io)経由で取るベストエフォート機能。銘柄コードが外部サービスに送信される。取得可否・値の鮮度は保証されないため、<b>発注判断では必ず板・現在値を確認</b>すること。</li>
+      <li>株価の「⚡ 自動取得」は、このSitesアプリのサーバーから Yahoo Finance の遅延データを取得するベストエフォート機能。取得可否・値の鮮度は保証されないため、<b>発注判断では必ず板・現在値を確認</b>すること。</li>
     </ul>
     <details class="history">
       <summary>料率改定・このツールの更新履歴</summary>
@@ -433,14 +433,6 @@ const DEFAULT_CONFIG = {
     costRateGuide: 20       // コスト率の目安 %(これ以下なら「クロスする」の目安=緑、超えたら警告色)。クロス民の一般的な基準は優待価値の20%
   },
 
-  // 株価自動取得に使う CORS 中継URL(上から順に試す。{url} が取得先URLに置換される)
-  // 公開中継は不安定。自分専用中継の作り方は tools/price-proxy.gs 参照(作ったURLを ⚙設定で先頭に追加)
-  priceProxies: [
-    'https://corsproxy.io/?url={url}',
-    'https://api.cors.lol/?url={url}',
-    'https://api.allorigins.win/raw?url={url}'
-  ],
-
   // 料率改定とこのツールの更新の履歴(フッターに表示)。料率を改定・訂正したらここに1行追記する
   history: {
     rates: [
@@ -451,6 +443,7 @@ const DEFAULT_CONFIG = {
       '2026/01/05 日興: 一般(3年)貸株料 1.40%→1.70%、制度買方金利 2.50%→2.97%'
     ],
     tool: [
+      '2026/09/02 GitHub PagesからSitesへ移行。無料CORS中継を廃止し、Sitesの同一オリジンAPIから株価を取得する方式に変更',
       '2026/07/23 スマホの取引条件を1列表示にして日付入力の重なりを解消。権利確定日候補は直近3ヶ月を月ごとの1行・短い表記で表示',
       '2026/07/23 権利日程ボタン選択時は入力済みの約定日を過去日でも動かさず、未入力または権利付最終日を過ぎる場合だけ補正するよう再修正',
       '2026/07/23 権利付最終日を取引条件内で権利落ち日より前に表示し、3ヶ月先までの権利日程ボタンを自動生成(スマホでも詰めて表示)',
@@ -580,19 +573,11 @@ const DEFAULT_CONFIG = {
   }
 };
 
-/* 株価・銘柄名の自動取得(ベストエフォート): Yahoo Finance の遅延データを CORS 中継経由で取得する。
- * ブラウザから外部サイトを直接読めない(CORS)ための中継で、URLは ⚙設定「株価取得の中継URL」で
- * 差し替え・追加できる({url} 部分が取得先URLに置換され、上から順に試す)。
- * 公開の無料中継は不安定(例: corsproxy.io の無料枠は localhost 限定)。確実に使うには
- *   1) tools/serve.command(Mac)/ tools/serve.bat(Windows)から開く(localhost になり corsproxy.io が使える)か、
- *   2) tools/price-proxy.gs で自分専用の中継(Google Apps Script・無料)を作り、そのURLを設定の先頭に追加する。
- * 取得失敗時は手入力にフォールバックするだけで、計算機能には影響しない。 */
-const ARTIFACT_BUILD = false; // Artifact(claude.ai 配布版)の生成時に true へ置換され、自動取得UIを隠す
-const PRICE_STATUS_DEFAULT = ARTIFACT_BUILD
-  ? 'この配布版は手入力のみ(自動取得はローカル版 tools/cost-simulator.html で)'
-  : '銘柄コードを入れると自動で取得(手入力も可)';
-const PRICE_CHART = code => 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(code) + '.T';
-const PRICE_SEARCH = code => 'https://query1.finance.yahoo.com/v1/finance/search?q=' + encodeURIComponent(code) + '.T&lang=ja-JP&region=JP&quotesCount=1&newsCount=0';
+/* 株価・銘柄名の自動取得(ベストエフォート): 同一オリジンのSites APIが
+ * Yahoo Finance の遅延データをサーバー側で取得する。取得失敗時は手入力に
+ * フォールバックするだけで、計算機能には影響しない。 */
+const PRICE_STATUS_DEFAULT = '銘柄コードを入れると自動で取得(手入力も可)';
+const PRICE_API = code => '/api/quote?code=' + encodeURIComponent(code);
 
 const BROKER_ORDER = ['nikko', 'rakuten', 'sbi', 'esmart'];
 const LS_CONFIG = 'yutai-cross-sim-config-v1';
@@ -1223,69 +1208,64 @@ function renderLinks() {
   }
 }
 
-/* 株価・銘柄名の自動取得(ベストエフォート)。中継URLを上から順に試し、失敗しても手入力にフォールバックするだけ */
-function applyProxy(tpl, url) {
-  return tpl.includes('{url}') ? tpl.replace('{url}', encodeURIComponent(url)) : tpl + encodeURIComponent(url);
-}
-async function fetchJsonVia(proxyTpl, url) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 7000); // 7秒で必ず打ち切って次の中継へ
-  try {
-    const r = await fetch(applyProxy(proxyTpl, url), { signal: ctrl.signal, cache: 'no-store' });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return await r.json();
-  } finally {
-    clearTimeout(timer);
-  }
-}
+/* 株価・銘柄名の自動取得(ベストエフォート)。同一オリジンAPIだけを呼ぶためCORS中継は不要。 */
+let activePriceController = null;
+let priceFetchSequence = 0;
 async function fetchPrice() {
   const code = (inputState.code || '').trim().toUpperCase();
   const st = document.getElementById('priceStatus');
   const btn = document.getElementById('btnFetchPrice');
-  if (btn.disabled) return; // 実行中の多重起動を防ぐ
   if (!/^[0-9A-Z]{4,5}$/.test(code)) {
     st.textContent = '先に銘柄コードを入力してください';
     return;
   }
+
+  if (activePriceController) activePriceController.abort();
+  const ctrl = new AbortController();
+  activePriceController = ctrl;
+  const sequence = ++priceFetchSequence;
+  const timer = setTimeout(() => ctrl.abort(), 8000);
   btn.disabled = true;
-  const proxies = (config.priceProxies || []).filter(Boolean);
-  for (let i = 0; i < proxies.length; i++) {
-    st.textContent = '取得中…(中継 ' + (i + 1) + '/' + proxies.length + ')';
-    try {
-      const [chart, search] = await Promise.all([
-        fetchJsonVia(proxies[i], PRICE_CHART(code)),
-        fetchJsonVia(proxies[i], PRICE_SEARCH(code)).catch(() => null) // 銘柄名は取れたらでよい
-      ]);
-      const meta = chart && chart.chart && chart.chart.result && chart.chart.result[0] && chart.chart.result[0].meta;
-      const price = meta && meta.regularMarketPrice;
+  st.textContent = '取得中…';
+
+  try {
+      const response = await fetch(PRICE_API(code), { signal: ctrl.signal, cache: 'no-store' });
+      const quote = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(quote.error || 'HTTP ' + response.status);
+      if (sequence !== priceFetchSequence || (inputState.code || '').trim().toUpperCase() !== code) return;
+      const price = quote.price;
       if (!price) throw new Error('no price');
       const el = document.getElementById('inPrice');
       el.value = price;
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      const q = search && search.quotes && search.quotes[0];
-      const jname = q && (q.longname || q.shortname);
+      inputState.price = String(price);
+      const jname = quote.name;
       const nameEl = document.getElementById('inName');
       if (jname && !nameEl.value) { // 内蔵辞書(JPX正式名)で埋まっていれば上書きしない
         nameEl.value = jname;
-        nameEl.dispatchEvent(new Event('input', { bubbles: true }));
+        inputState.name = jname;
       }
       let when = '';
-      if (meta.regularMarketTime) {
-        const t = new Date(meta.regularMarketTime * 1000);
+      if (quote.marketTime) {
+        const t = new Date(quote.marketTime * 1000);
         when = '(' + (t.getMonth() + 1) + '/' + t.getDate() + ' ' +
           String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0') + ' 時点)';
       }
       st.textContent = '取得: ' + Number(price).toLocaleString('ja-JP') + '円' + when + ' — 遅延データの可能性。発注前に板で確認';
       inputState.priceNote = st.textContent; // リロード後も「いつの値か」が分かるように保存
       saveInput();
+      renderAll();
+  } catch (e) {
+    if (sequence !== priceFetchSequence) return;
+    st.textContent = e && e.name === 'AbortError'
+      ? '取得がタイムアウトしました。リンク先で確認して手入力を'
+      : '自動取得できず。リンク先で確認して手入力を';
+  } finally {
+    clearTimeout(timer);
+    if (sequence === priceFetchSequence) {
+      activePriceController = null;
       btn.disabled = false;
-      return;
-    } catch (e) { /* 次の中継へ */ }
+    }
   }
-  st.textContent = (location.protocol === 'file:')
-    ? '取得できず。ファイル直開き(file://)では無料中継に断られやすい — serve.command(Mac)/serve.bat(Windows)から開くと使えます(または⚙設定に自分専用の中継URLを追加)'
-    : '自動取得できず(中継の停止・混雑の可能性)。リンク先で確認して手入力を';
-  btn.disabled = false;
 }
 
 /* 銘柄コードの変更: 前の銘柄の名前・株価が残らないようにクリアし、
@@ -1293,6 +1273,10 @@ async function fetchPrice() {
 let codeFetchTimer = null;
 function onCodeChanged() {
   const code = (inputState.code || '').trim().toUpperCase();
+  if (activePriceController) activePriceController.abort();
+  activePriceController = null;
+  priceFetchSequence++;
+  document.getElementById('btnFetchPrice').disabled = false;
   inputState.name = '';
   inputState.price = '';
   inputState.priceNote = '';
@@ -1306,7 +1290,7 @@ function onCodeChanged() {
     document.getElementById('inName').value = dictName;
   }
   clearTimeout(codeFetchTimer);
-  if (!ARTIFACT_BUILD && /^[0-9A-Z]{4,5}$/.test(code)) {
+  if (/^[0-9A-Z]{4,5}$/.test(code)) {
     codeFetchTimer = setTimeout(fetchPrice, 600);
   }
 }
@@ -1373,8 +1357,6 @@ const SETTING_FIELDS = [
     options: [['floor', '切り捨て(多くの会社)'], ['round', '四捨五入'], ['ceil', '切り上げ']] },
   { path: 'calc.interestDays', label: '現引きまでの買方金利日数(当日現引き=1、翌営業日=2)', unit: '日' },
   { path: 'calc.costRateGuide', label: 'コスト率の目安(これ以下なら緑=クロス推奨。クロス民の一般的な基準は20%)', unit: '%' },
-  { path: 'priceProxies', label: '株価取得の中継URL(1行1つ・上から順に試す。{url} が取得先URLに置換される。自分専用中継の作り方は tools/price-proxy.gs)', type: 'lines' },
-
   { section: 'SMBC日興証券' },
   { path: 'brokers.nikko.sell.general.rate', label: '一般信用(3年)貸株料', unit: '%' },
   { path: 'brokers.nikko.sell.seido.rate', label: '制度信用貸株料', unit: '%' },
@@ -1614,14 +1596,6 @@ function init() {
   renderKenriButtons();
   document.getElementById('btnFetchPrice').addEventListener('click', fetchPrice);
   document.getElementById('priceStatus').textContent = inputState.priceNote || PRICE_STATUS_DEFAULT;
-  if (ARTIFACT_BUILD) { // 配布版は外部取得不可 → 株価も「手入力」扱いの表示にする
-    document.getElementById('btnFetchPrice').style.display = 'none';
-    const chip = document.getElementById('chipPrice');
-    chip.textContent = '手入力';
-    chip.className = 'chip manual';
-    document.getElementById('inPrice').classList.add('manual');
-  }
-
   // confirm/alert はこの配布環境(claude.ai)でブロックされるため使わず、「2回押し」で誤操作を防ぐ
   armTwice(document.getElementById('btnClearInput'), 'もう一度押すとクリア', () => {
     try { localStorage.removeItem(LS_INPUT); } catch (e) {}

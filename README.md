@@ -20,6 +20,23 @@ Claude Code でこのリポジトリを開いて質問すると、マニュア�
 | [manual/10-glossary.md](manual/10-glossary.md) | 用語集 |
 | [manual/11-recovery.md](manual/11-recovery.md) | **失敗時のリカバリーガイド** — やってしまった後の対処手順(症状別) |
 | [slides/yutai-cross-slides.html](slides/yutai-cross-slides.html) | **スライド版**(図解中心のビジュアルガイド。ブラウザで開く) |
+| [public/calculator.html](public/calculator.html) | **優待クロス計算機** — 4社の概算コスト比較画面 |
+| [app/api/quote/route.ts](app/api/quote/route.ts) | SitesからYahoo Financeへ接続する株価取得API |
+
+## 開発
+
+Node.js 22.13以降で次を実行する。
+
+```powershell
+npm install
+npm test
+npm run typecheck
+npm run dev
+```
+
+開発画面は `http://localhost:3000/`。公開先はOpenAI Sitesで、ブラウザは外部CORS中継を使わず同一オリジンの `/api/quote` を呼ぶ。
+
+公開手順は [docs/agents/release.md](docs/agents/release.md) を参照する。
 
 ## 注意
 
