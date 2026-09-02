@@ -36,6 +36,8 @@ npm run dev
 
 開発画面は `http://localhost:3000/`。公開先はOpenAI Sitesで、ブラウザは外部CORS中継を使わず同一オリジンの `/api/quote` を呼ぶ。
 
+公開URL: https://yutai-cross-calculator.workspace-843878.chatgpt.site
+
 公開手順は [docs/agents/release.md](docs/agents/release.md) を参照する。
 
 ## 注意
