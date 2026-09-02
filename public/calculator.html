@@ -107,6 +107,21 @@
   }
   .field input:focus, .field select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   .field .after { font-size: 12px; color: var(--sub); margin-top: 3px; }
+  .stock-suggestions {
+    display: grid; gap: 4px; margin-top: 5px;
+    padding: 5px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--panel); box-shadow: var(--shadow);
+  }
+  .stock-suggestions[hidden] { display: none; }
+  .stock-suggestion {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    width: 100%; padding: 6px 8px; text-align: left;
+    background: var(--bg); border-color: transparent;
+  }
+  .stock-suggestion:hover, .stock-suggestion:focus-visible {
+    border-color: var(--accent); color: var(--accent); outline: none;
+  }
+  .stock-suggestion-code { color: var(--sub); font-variant-numeric: tabular-nums; }
 
   /* 入力欄の色分け: 黄 = 自動では入らない(手入力) / 緑チップ = コード入力で自動反映 */
   .chip {
@@ -331,8 +346,10 @@
       </div>
       <div class="field">
         <label for="inName">銘柄名(名前からの検索もここ)<span class="chip auto">自動</span></label>
-        <input id="inName" type="text" placeholder="例: 吉野家(2文字で候補表示)" list="stockNameList">
-        <datalist id="stockNameList"></datalist>
+        <input id="inName" type="text" placeholder="例: 吉野家(2文字で候補表示)" autocomplete="off"
+          aria-autocomplete="list" aria-controls="stockNameSuggestions" aria-expanded="false">
+        <div id="stockNameSuggestions" class="stock-suggestions" role="listbox"
+          aria-label="銘柄名の検索候補" hidden></div>
       </div>
       <div class="field">
         <label for="inPrice">株価(円)<span class="chip auto" id="chipPrice">自動</span></label>
@@ -1296,8 +1313,22 @@ function onCodeChanged() {
 }
 
 /* 銘柄名からの逆引き: 2文字以上で内蔵辞書から候補(最大10件)を出し、
-   候補を選ぶ(または名前を正確に入力する)とコード欄に自動セット → 株価取得まで連鎖する */
+   画面上の候補を選ぶ(または名前を正確に入力する)とコード欄に自動セット → 株価取得まで連鎖する */
 let nameToCode = null;
+function clearStockNameSuggestions() {
+  const suggestions = document.getElementById('stockNameSuggestions');
+  suggestions.innerHTML = '';
+  suggestions.hidden = true;
+  document.getElementById('inName').setAttribute('aria-expanded', 'false');
+}
+
+function selectStockName(code) {
+  clearStockNameSuggestions();
+  const codeEl = document.getElementById('inCode');
+  codeEl.value = code;
+  codeEl.dispatchEvent(new Event('input', { bubbles: true })); // onCodeChanged 経由で銘柄名・株価が整う
+}
+
 function onNameTyped() {
   const v = (inputState.name || '').trim();
   if (!nameToCode) {
@@ -1306,23 +1337,35 @@ function onNameTyped() {
   }
   const hit = nameToCode[v];
   if (hit && (inputState.code || '').trim().toUpperCase() !== hit) {
-    const codeEl = document.getElementById('inCode');
-    codeEl.value = hit;
-    codeEl.dispatchEvent(new Event('input', { bubbles: true })); // onCodeChanged 経由で銘柄名・株価が整う
+    selectStockName(hit);
     return;
   }
-  const dl = document.getElementById('stockNameList');
-  dl.innerHTML = '';
+  clearStockNameSuggestions();
   if (v.length >= 2 && !hit) {
+    const suggestions = document.getElementById('stockNameSuggestions');
+    const query = v.toLocaleLowerCase('ja-JP');
     let count = 0;
     for (const [c, n] of Object.entries(STOCK_NAMES)) {
-      if (n.includes(v)) {
-        const opt = document.createElement('option');
-        opt.value = n;
-        opt.label = c;
-        dl.appendChild(opt);
+      if (n.toLocaleLowerCase('ja-JP').includes(query)) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'stock-suggestion';
+        button.dataset.stockCode = c;
+        button.setAttribute('role', 'option');
+        const name = document.createElement('span');
+        name.textContent = n;
+        const code = document.createElement('span');
+        code.className = 'stock-suggestion-code';
+        code.textContent = c;
+        button.append(name, code);
+        button.addEventListener('click', () => selectStockName(c));
+        suggestions.appendChild(button);
         if (++count >= 10) break;
       }
+    }
+    if (count) {
+      suggestions.hidden = false;
+      document.getElementById('inName').setAttribute('aria-expanded', 'true');
     }
   }
 }
@@ -1586,6 +1629,17 @@ function init() {
 
   bindInput('inCode', 'code', onCodeChanged);
   bindInput('inName', 'name', onNameTyped);
+  document.getElementById('inName').addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown') {
+      const first = document.querySelector('#stockNameSuggestions .stock-suggestion');
+      if (first) {
+        event.preventDefault();
+        first.focus();
+      }
+    } else if (event.key === 'Escape') {
+      clearStockNameSuggestions();
+    }
+  });
   bindInput('inPrice', 'price', onPriceTyped);
   bindInput('inShares', 'shares');
   bindInput('inTate', 'tate');
@@ -1602,6 +1656,7 @@ function init() {
     inputState = loadInput();
     document.getElementById('inCode').value = '';
     document.getElementById('inName').value = '';
+    clearStockNameSuggestions();
     document.getElementById('inPrice').value = '';
     document.getElementById('inShares').value = inputState.shares;
     document.getElementById('inYutai').value = '';
