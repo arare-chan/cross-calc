@@ -61,3 +61,64 @@ describe("calculator stock-name search", () => {
     }
   }, 20_000);
 });
+
+describe("SMBC Nikko buy interest", () => {
+  it.each([
+    ["2026-10-21", "3.54%"],
+    ["2026-10-22", "3.69%"],
+  ])("uses the rate effective on the execution date %s", async (executionDate, expectedRate) => {
+    const html = await readFile(calculatorPath, "utf8");
+    const dom = new JSDOM(html, {
+      runScripts: "dangerously",
+      url: "https://calculator.test/",
+    });
+
+    try {
+      const setInput = (selector: string, value: string) => {
+        const input = dom.window.document.querySelector<HTMLInputElement>(selector);
+        expect(input).not.toBeNull();
+        input!.value = value;
+        input!.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+      };
+
+      setInput("#inPrice", "1000");
+      setInput("#inShares", "100");
+      setInput("#inLast", "2026-10-28");
+      setInput("#inTate", executionDate);
+
+      const nikkoCard = dom.window.document.querySelector('[data-broker="nikko"]');
+      expect(nikkoCard?.textContent).toContain(`買い建て金利(制度 ${expectedRate})`);
+    } finally {
+      dom.window.close();
+    }
+  });
+
+  it("switches existing positions to the new rate from the October 26 calculation", async () => {
+    const html = await readFile(calculatorPath, "utf8");
+    const dom = new JSDOM(html, {
+      runScripts: "dangerously",
+      url: "https://calculator.test/",
+    });
+
+    try {
+      dom.window.eval("config.calc.interestDays = 4; renderAll();");
+      for (const [selector, value] of [
+        ["#inPrice", "1000"],
+        ["#inShares", "100"],
+        ["#inLast", "2026-10-28"],
+        ["#inTate", "2026-10-21"],
+      ]) {
+        const input = dom.window.document.querySelector<HTMLInputElement>(selector);
+        expect(input).not.toBeNull();
+        input!.value = value;
+        input!.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+      }
+
+      const nikkoCard = dom.window.document.querySelector('[data-broker="nikko"]');
+      expect(nikkoCard?.textContent).toContain("買い建て金利(制度 3.54%→3.69%)");
+      expect(nikkoCard?.textContent).toContain("3.54% × 3日 + 3.69% × 1日");
+    } finally {
+      dom.window.close();
+    }
+  });
+});

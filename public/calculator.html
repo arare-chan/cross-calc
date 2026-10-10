@@ -434,12 +434,12 @@ const STOCK_NAMES = {"1301":"極洋","130A":"Veritas In Silico","1332":"ニッ�
 
 /* =====================================================================
  * 初期設定(料率改定時の手直しはここ、またはブラウザ上の⚙設定パネルから)
- * 出典: manual/03-nikko.md, 04-rakuten.md, 05-sbi.md, 06-esmart.md(2026-07-07 調査)
+ * 出典: manual/03-nikko.md(2026-10-10調査)、04-rakuten.md〜06-esmart.md(2026-07-07調査)
  * ⚙設定パネルでの変更は localStorage に保存され、このファイルの値より優先される。
  * ここを書き換えたときは、パネルの「初期値に戻す」で反映できる。
  * ===================================================================== */
 const DEFAULT_CONFIG = {
-  surveyDate: '2026-07-07',
+  surveyDate: '2026-10-10(日興金利のみ。その他は2026-07-07)',
 
   calc: {
     // 貸株料・金利の日数: 'bothEnds' = 新規建て受渡日から返済受渡日まで「両端入れ」(初日・最終日とも算入 = 受渡日の差+1日)。
@@ -453,6 +453,7 @@ const DEFAULT_CONFIG = {
   // 料率改定とこのツールの更新の履歴(フッターに表示)。料率を改定・訂正したらここに1行追記する
   history: {
     rates: [
+      '2026/10/22 日興: 制度買方金利 3.54%→3.69%、一般信用(オンライン)買方金利 4.04%→4.19%(既存建玉は10/26計算分〜。売方金利・貸株料は据え置き。公式告知2026/10/9)',
       '2026/07/21 日興: 制度買方金利 3.27%→3.54%(買方金利のみ。一般貸株料1.90%・売方金利0%・制度貸株料1.15%は据え置き。公式告知2026/7/9)',
       '2026/06/01 イースマ: 一般(長期)貸株料 1.50%→1.10%、制度買方金利 2.98%→2.80%',
       '2026/05/18 イースマ: SOR選択で現物・信用手数料0円に(1日定額コース廃止)',
@@ -460,6 +461,7 @@ const DEFAULT_CONFIG = {
       '2026/01/05 日興: 一般(3年)貸株料 1.40%→1.70%、制度買方金利 2.50%→2.97%'
     ],
     tool: [
+      '2026/10/10 日興の制度買方金利を約定日で自動切替。2026/10/21約定までは3.54%、10/22約定分から3.69%を適用',
       '2026/09/02 GitHub PagesからSitesへ移行。無料CORS中継を廃止し、Sitesの同一オリジンAPIから株価を取得する方式に変更',
       '2026/07/23 スマホの取引条件を1列表示にして日付入力の重なりを解消。権利確定日候補は直近3ヶ月を月ごとの1行・短い表記で表示',
       '2026/07/23 権利日程ボタン選択時は入力済みの約定日を過去日でも動かさず、未入力または権利付最終日を過ぎる場合だけ補正するよう再修正',
@@ -514,13 +516,16 @@ const DEFAULT_CONFIG = {
       name: 'SMBC日興証券',
       courseNote: 'ダイレクトコース前提(信用手数料0円・現物は有料)',
       feeNote: 'ダイレクトコース0円',
-      rateNote: '料率改定: 制度買方金利 2026/7/21約定分〜3.54%(一般貸株料1.90%は据え置き)',
+      rateNote: '料率改定: 制度買方金利 2026/10/22約定分〜3.69%(10/21約定までは3.54%。一般貸株料1.90%は据え置き)',
       sell: {
         general: { label: '一般信用(3年)', rate: 1.90, seido: false },
         seido:   { label: '制度信用(6ヶ月)', rate: 1.15, seido: true }
       },
       defaultSell: 'general',
-      buyInterest: 3.54,        // 制度信用買方金利 %(2026/7/21約定分〜。旧3.27%は2026/3/30〜)
+      buyInterest: 3.54,        // 制度信用買方金利 %(2026/10/21約定分まで)
+      buyInterestSchedule: [
+        { from: '2026-10-22', existingFrom: '2026-10-26', rate: 3.69 }
+      ],
       marginFee: 0,             // 信用売買手数料(円)
       physical: 'table',        // 現物手数料: 約定代金テーブル(下記)
       physicalFeeTable: [       // [約定代金の上限(円), 手数料(円)] 昇順
@@ -628,6 +633,27 @@ function mergeDeep(base, over) {
     }
   }
   return base;
+}
+
+function buyInterestSegments(broker, executionDate, days, holidays) {
+  const segments = [];
+  const executionYmd = toYMD(executionDate);
+  const accrualStart = addBizDays(executionDate, 2, holidays);
+  for (let day = 0; day < days; day++) {
+    const accrualDate = new Date(accrualStart);
+    accrualDate.setDate(accrualDate.getDate() + day);
+    const accrualYmd = toYMD(accrualDate);
+    let rate = broker.buyInterest;
+    for (const change of broker.buyInterestSchedule || []) {
+      if (executionYmd >= change.from || (change.existingFrom && accrualYmd >= change.existingFrom)) {
+        rate = change.rate;
+      }
+    }
+    const previous = segments[segments.length - 1];
+    if (previous && previous.rate === rate) previous.days++;
+    else segments.push({ rate, days: 1 });
+  }
+  return segments;
 }
 
 function loadInput() {
@@ -908,11 +934,15 @@ function calcBroker(key) {
   if (buyMethod === 'genbiki') {
     items.push({ label: '買い建て手数料(信用)', amount: b.marginFee, formula: b.marginFee === 0 ? (b.feeNote || '') : '' });
     const idays = Number(config.calc.interestDays) || 1;
-    const interest = roundYen(amount * b.buyInterest / 100 * idays / 365);
+    const interestSegments = buyInterestSegments(b, tate, idays, set);
+    const rateDays = interestSegments.reduce((sum, segment) => sum + segment.rate * segment.days, 0);
+    const interest = roundYen(amount * rateDays / 100 / 365);
+    const interestLabel = interestSegments.map(segment => segment.rate + '%').join('→');
+    const interestFormula = interestSegments.map(segment => segment.rate + '% × ' + segment.days + '日').join(' + ');
     items.push({
-      label: '買い建て金利(制度 ' + b.buyInterest + '%)',
+      label: '買い建て金利(制度 ' + interestLabel + ')',
       amount: interest,
-      formula: fmtYen(amount) + '円 × ' + b.buyInterest + '% × ' + idays + '日 ÷ 365'
+      formula: fmtYen(amount) + '円 × (' + interestFormula + ') ÷ 365'
     });
     items.push({ label: '現引き手数料', amount: 0, formula: '' });
     warnings.push('当日現引きが前提(現引き忘れは優待の権利を失う致命的事故)。');
@@ -1403,7 +1433,8 @@ const SETTING_FIELDS = [
   { section: 'SMBC日興証券' },
   { path: 'brokers.nikko.sell.general.rate', label: '一般信用(3年)貸株料', unit: '%' },
   { path: 'brokers.nikko.sell.seido.rate', label: '制度信用貸株料', unit: '%' },
-  { path: 'brokers.nikko.buyInterest', label: '制度信用買方金利', unit: '%' },
+  { path: 'brokers.nikko.buyInterest', label: '制度信用買方金利(2026/10/21約定分まで)', unit: '%' },
+  { path: 'brokers.nikko.buyInterestSchedule.0.rate', label: '制度信用買方金利(2026/10/22約定分から)', unit: '%' },
   { path: 'brokers.nikko.physicalFeeTable', label: '現物手数料テーブル(上限額:手数料 をカンマ区切り)', type: 'feetable' },
   { note: '事務管理費: なし(公式明記)。信用手数料はダイレクトコースで0円。' },
 
