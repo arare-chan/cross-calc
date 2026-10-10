@@ -10,6 +10,7 @@
 - `manual/10-glossary.md` は用語の正本。同じ概念に別名を増やさない。
 - `public/calculator.html` は計算ツール。料率やルールの変更時は `DEFAULT_CONFIG` を含めてマニュアルと整合させる。
 - `app/api/quote/route.ts` はSites上の株価取得API。ブラウザからは同一オリジンで呼び、Yahoo Financeへの取得はサーバー側だけで行う。
+- `app/api/listing-status/route.ts` は東証公式資料による市場区分・上場状態のAPI。利用時のみ更新し、取得結果を24時間再利用する。計画入りの表示定義は用語集、更新設計は `docs/adr/0002-on-demand-listing-status.md` を参照する。
 - `slides/yutai-cross-slides.html` はマニュアルの要点を伝える派生成果物。大きな数値変更は横断反映する。
 - `app/page.tsx` はSites版の入口。公開先はGitHub PagesではなくSitesとする。
 - 料率、手数料、受付時刻、制度ルールの最終的な情報源は各社・取引所・日証金の公式情報。マニュアル末尾の出典を確認する。

@@ -6,6 +6,120 @@ import { describe, expect, it, vi } from "vitest";
 
 const calculatorPath = fileURLToPath(new URL("./calculator.html", import.meta.url));
 
+describe("calculator listing state", () => {
+  const snapshot = (checkedAt = new Date().toISOString()) => ({
+    schemaVersion: 1,
+    checkedAt,
+    marketBaseDate: "2026-09-30",
+    planPublishedDate: "2026-10-07",
+    stale: false,
+    entries: {
+      "5380": {
+        name: "新東",
+        market: "スタンダード",
+        labels: ["監理銘柄", "計画入り"],
+        details: ["超過計画開示会社"],
+      },
+      "9861": { name: "吉野家ホールディングス", market: "プライム", labels: [], details: [] },
+    },
+  });
+  const enter = (dom: JSDOM, code: string) => {
+    const input = dom.window.document.querySelector<HTMLInputElement>("#inCode")!;
+    input.value = code;
+    input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+  };
+
+  it("uses the stored daily snapshot without fetching and clears labels when switching stocks", async () => {
+    const fetchMock = vi.fn();
+    const dom = new JSDOM(await readFile(calculatorPath, "utf8"), {
+      runScripts: "dangerously",
+      url: "https://calculator.test/",
+      beforeParse(window) {
+        window.localStorage.setItem("yutai-listing-status-v1", JSON.stringify(snapshot()));
+        Object.defineProperty(window, "fetch", { value: fetchMock });
+      },
+    });
+    try {
+      enter(dom, "5380");
+      expect(dom.window.document.querySelector("#outListingMarket")?.textContent).toBe(
+        "スタンダード",
+      );
+      expect(dom.window.document.querySelector("#outListingLabels")?.textContent).toContain(
+        "計画入り",
+      );
+      enter(dom, "9861");
+      expect(dom.window.document.querySelector("#outListingLabels")?.textContent).toBe("");
+      expect(dom.window.document.querySelector("#outListingMarket")?.textContent).toBe("プライム");
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      dom.window.close();
+    }
+  });
+
+  it("shows the current stock even when the shared response arrives after a code change", async () => {
+    let resolve!: (value: unknown) => void;
+    const response = new Promise((done) => {
+      resolve = done;
+    });
+    const fetchMock = vi.fn((_url: string) => response);
+    const dom = new JSDOM(await readFile(calculatorPath, "utf8"), {
+      runScripts: "dangerously",
+      url: "https://calculator.test/",
+      beforeParse(window) {
+        Object.defineProperty(window, "fetch", { value: fetchMock });
+      },
+    });
+    try {
+      enter(dom, "5380");
+      enter(dom, "9861");
+      resolve({ ok: true, json: async () => snapshot() });
+      await vi.waitFor(() =>
+        expect(dom.window.document.querySelector("#outListingMarket")?.textContent).toBe(
+          "プライム",
+        ),
+      );
+      expect(dom.window.document.querySelector("#outListingLabels")?.textContent).toBe("");
+      expect(fetchMock.mock.calls.filter(([url]) => url === "/api/listing-status")).toHaveLength(1);
+    } finally {
+      dom.window.close();
+    }
+  });
+
+  it("refreshes an expired snapshot and preserves its labels with a failure notice if offline", async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new Error("offline");
+    });
+    const dom = new JSDOM(await readFile(calculatorPath, "utf8"), {
+      runScripts: "dangerously",
+      url: "https://calculator.test/",
+      beforeParse(window) {
+        window.localStorage.setItem(
+          "yutai-listing-status-v1",
+          JSON.stringify(snapshot(new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString())),
+        );
+        Object.defineProperty(window, "fetch", { value: fetchMock });
+      },
+    });
+    try {
+      enter(dom, "5380");
+      await vi.waitFor(() =>
+        expect(dom.window.document.querySelector("#listingStatusNote")?.textContent).toContain(
+          "更新できず・前回の情報",
+        ),
+      );
+      expect(dom.window.document.querySelector("#outListingLabels")?.textContent).toContain(
+        "計画入り",
+      );
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/listing-status",
+        expect.objectContaining({ cache: "no-store" }),
+      );
+    } finally {
+      dom.window.close();
+    }
+  });
+});
+
 describe("calculator stock-name search", () => {
   it("selects a visible name candidate and fetches its quote", async () => {
     const html = await readFile(calculatorPath, "utf8");
@@ -45,7 +159,10 @@ describe("calculator stock-name search", () => {
 
       candidate!.click();
       expect(codeInput?.value).toBe("9861");
-      expect(dom.window.document.querySelector("#outTopixDate")?.textContent).toBe("2026/10");
+      expect(dom.window.document.querySelector("#outTopixDate")).toBeNull();
+      expect(dom.window.document.querySelector('label[for="outTopixCategory"]')?.textContent).toBe(
+        "TOPIX区分（2026/10）",
+      );
       expect(dom.window.document.querySelector("#outTopixCategory")?.textContent).toBe("継続");
 
       await vi.waitFor(
@@ -83,7 +200,6 @@ describe("calculator stock-name search", () => {
 
     try {
       const codeInput = dom.window.document.querySelector<HTMLInputElement>("#inCode");
-      const topixDate = dom.window.document.querySelector<HTMLOutputElement>("#outTopixDate");
       const topixCategory =
         dom.window.document.querySelector<HTMLOutputElement>("#outTopixCategory");
 
@@ -91,7 +207,6 @@ describe("calculator stock-name search", () => {
       codeInput!.value = code;
       codeInput!.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
 
-      expect(topixDate?.textContent).toBe("2026/10");
       expect(topixCategory?.textContent).toBe(expectedCategory);
     } finally {
       dom.window.close();
