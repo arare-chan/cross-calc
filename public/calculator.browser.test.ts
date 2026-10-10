@@ -45,6 +45,8 @@ describe("calculator stock-name search", () => {
 
       candidate!.click();
       expect(codeInput?.value).toBe("9861");
+      expect(dom.window.document.querySelector("#outTopixDate")?.textContent).toBe("2026/10");
+      expect(dom.window.document.querySelector("#outTopixCategory")?.textContent).toBe("継続");
 
       await vi.waitFor(
         () => {
@@ -60,6 +62,58 @@ describe("calculator stock-name search", () => {
       dom.window.close();
     }
   }, 20_000);
+
+  it.each([
+    ["1723", "新規"],
+    ["593A", "新規"],
+    ["1301", "移行"],
+    ["9861", "継続"],
+    ["1380", "構成外"],
+  ])("shows the October 2026 TOPIX classification for %s", async (code, expectedCategory) => {
+    const html = await readFile(calculatorPath, "utf8");
+    const dom = new JSDOM(html, {
+      beforeParse(window) {
+        Object.defineProperty(window, "fetch", {
+          value: vi.fn(() => new Promise(() => {})),
+        });
+      },
+      runScripts: "dangerously",
+      url: "https://calculator.test/",
+    });
+
+    try {
+      const codeInput = dom.window.document.querySelector<HTMLInputElement>("#inCode");
+      const topixDate = dom.window.document.querySelector<HTMLOutputElement>("#outTopixDate");
+      const topixCategory =
+        dom.window.document.querySelector<HTMLOutputElement>("#outTopixCategory");
+
+      expect(codeInput).not.toBeNull();
+      codeInput!.value = code;
+      codeInput!.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+
+      expect(topixDate?.textContent).toBe("2026/10");
+      expect(topixCategory?.textContent).toBe(expectedCategory);
+    } finally {
+      dom.window.close();
+    }
+  });
+
+  it("has a searchable stock name for every classified TOPIX code", async () => {
+    const html = await readFile(calculatorPath, "utf8");
+    const dom = new JSDOM(html, {
+      runScripts: "dangerously",
+      url: "https://calculator.test/",
+    });
+
+    try {
+      const missing = dom.window.eval(
+        "[...TOPIX_NEW, ...TOPIX_TRANSITION, ...TOPIX_CONTINUED].filter(code => !STOCK_NAMES[code])",
+      );
+      expect(missing).toEqual([]);
+    } finally {
+      dom.window.close();
+    }
+  });
 });
 
 describe("SMBC Nikko buy interest", () => {

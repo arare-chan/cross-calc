@@ -4,8 +4,8 @@
 新規上場・社名変更・上場廃止を反映したいときに実行する(月1回程度で十分)。
 
 使い方:
-  1. 依存ライブラリ xlrd が必要(システムPythonが保護されている場合は venv で):
-       python3 -m venv /tmp/jpx-venv && /tmp/jpx-venv/bin/pip install xlrd
+  1. 依存ライブラリ openpyxl が必要(システムPythonが保護されている場合は venv で):
+       python3 -m venv /tmp/jpx-venv && /tmp/jpx-venv/bin/pip install openpyxl
   2. 実行:
        /tmp/jpx-venv/bin/python tools/update-stock-names.py
   3. public/calculator.html 内の STOCK_NAMES ブロックが最新データで置き換わる。
@@ -14,13 +14,14 @@
   https://www.jpx.co.jp/markets/statistics-equities/misc/01.html
 """
 import json
+import io
 import os
 import unicodedata
 import urllib.request
 
-import xlrd
+import openpyxl
 
-XLS_URL = "https://www.jpx.co.jp/markets/statistics-equities/misc/tvdivq0000001vg2-att/data_j.xls"
+XLSX_URL = "https://www.jpx.co.jp/markets/statistics-equities/misc/tvdivq0000001vg2-att/data_j.xlsx"
 HTML_PATH = os.path.join(os.path.dirname(__file__), "..", "public", "calculator.html")
 TS_PATH = os.path.join(os.path.dirname(__file__), "..", "lib", "stock-names.ts")
 
@@ -29,6 +30,13 @@ INCLUDE = {
     "プライム(内国株式)", "スタンダード(内国株式)", "グロース(内国株式)",
     "プライム(外国株式)", "スタンダード(外国株式)", "グロース(外国株式)",
     "REIT・ベンチャーファンド・カントリーファンド・インフラファンド", "出資証券",
+}
+
+# 月末一覧の基準日後に効力発生する組織再編銘柄。次回の月末一覧に載ったら削除する。
+# 出典: JPX「TOPIX初回定期入替における選定結果」(2026年10月7日公表)
+EXTRA_NAMES = {
+    "641A": "NOK Group",
+    "642A": "キューデンホールディングス",
 }
 
 MARKER_START = "/* === STOCK_NAMES:BEGIN(自動生成 — 手で編集しない) === */"
@@ -41,26 +49,28 @@ def norm(s: str) -> str:
 
 def main() -> None:
     print("JPXから東証上場銘柄一覧をダウンロード中…")
-    xls_bytes = urllib.request.urlopen(XLS_URL, timeout=60).read()
-    book = xlrd.open_workbook(file_contents=xls_bytes)
-    sh = book.sheet_by_index(0)
+    xlsx_bytes = urllib.request.urlopen(XLSX_URL, timeout=60).read()
+    book = openpyxl.load_workbook(io.BytesIO(xlsx_bytes), read_only=True, data_only=True)
+    sh = book.active
 
     names = {}
     base_date = None
-    for r in range(1, sh.nrows):
+    for row in sh.iter_rows(min_row=2, values_only=True):
         if base_date is None:
-            base_date = str(int(sh.cell_value(r, 0)))
+            base_date = str(int(row[0]))
         # 市場区分も NFKC 正規化して比較(全角括弧の揺れを吸収)
-        if norm(sh.cell_value(r, 3)) not in INCLUDE:
+        if norm(row[3]) not in INCLUDE:
             continue
-        code_v = sh.cell_value(r, 1)
+        code_v = row[1]
         code = str(int(code_v)) if isinstance(code_v, float) else str(code_v).strip()
-        names[code] = norm(sh.cell_value(r, 2))
+        names[code] = norm(row[2])
+
+    names.update(EXTRA_NAMES)
 
     js = json.dumps(names, ensure_ascii=False, separators=(",", ":"))
     block = (
         MARKER_START + "\n"
-        + "// 銘柄コード → 銘柄名の辞書。JPX「東証上場銘柄一覧」(data_j.xls、基準日 " + base_date + ")から生成。\n"
+        + "// 銘柄コード → 銘柄名の辞書。JPX「東証上場銘柄一覧」(data_j.xlsx、基準日 " + base_date + ")から生成。\n"
         + "// 更新するときは tools/update-stock-names.py を実行する(新規上場・社名変更・上場廃止の反映)。\n"
         + "const STOCK_NAMES = " + js + ";\n"
         + MARKER_END
