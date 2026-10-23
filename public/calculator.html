@@ -219,6 +219,8 @@
   /* 合計(金利・貸株料・管理費など全部足した総額)= 一番見たい数字なので青く大きく強調 */
   .total .num { font-size: 32px; font-weight: 800; letter-spacing: .02em; color: var(--accent); }
   .total .unit { font-size: 13px; color: var(--accent); margin-left: 2px; }
+  .total-label { display: block; font-size: 11px; color: var(--sub); }
+  .close-comparison { margin: -6px 0 10px; font-size: 12px; color: var(--sub); overflow-wrap: anywhere; }
   /* 利回り(優待価値を入れた時だけ表示): お得額=緑(損なら赤)・コスト率 */
   .yield { display: flex; gap: 18px; flex-wrap: wrap; margin: 2px 0 10px; }
   .yield .yield-item { display: flex; flex-direction: column; }
@@ -425,11 +427,12 @@
     <ul>
       <li><b>配当がある銘柄</b>は、配当落調整金と受取配当の差額(目安: 配当額の約20%)が別途かかる(確定申告・損益通算で実質回収できる場合が多い)。</li>
       <li><b>制度信用売り</b>を選んだ場合は<b>逆日歩</b>(金額は権利落ち日まで不明・青天井)が別途かかりうる。</li>
-      <li>買い建玉のまま権利確定日を跨ぐと名義書換料(1単元55円)。当日現引きが前提のため計算に含めていない。</li>
+      <li>買い建玉のまま権利確定日を跨ぐと名義書換料(1単元55円)。寄りは当日現引き、大引けも権利付最終日までの現引きが前提で、名義書換料は計算に含めていない。</li>
       <li><b>事務管理費(楽天/SBI/イースマ)</b>は<b>約定日基準</b>で「建て日から1ヶ月経過ごと」に発生。クロスの現渡しは<b>権利付最終日の翌営業日(=権利落ち日)</b>に行うので、その日が<b>建て日の1ヶ月後の応当日ちょうどまで</b>なら「まだ経過していない」= <b>かからない</b>。つまり<b>権利落ち日の1ヶ月前(土日祝なら翌営業日)以降に建てればOK</b>(それより前だと1ヶ月分発生)。日興は管理費なし。</li>
       <li>手数料無料の前提コース(日興: ダイレクト/楽天: ゼロ/SBI: ゼロ革命+電子交付設定/イースマ: SOR選択)を満たしていること。</li>
       <li>円未満の端数処理は会社により異なるため、実際の請求額と数円ずれることがある。</li>
       <li>料率・祝日は改定されうる。<b>発注前に必ず各社公式サイトで最新料率を確認</b>すること(手直しは右上の⚙から。詳細は manual/ 各社ページ)。</li>
+      <li>寄り・大引けは同じ約定代金・売建区分・現渡し日で総額を比較。大きな金額と内訳は寄りの試算。現引きの受付条件は2026-10-23に公式で確認：<a href="https://www.smbcnikko.co.jp/service/online/trade/use/hour/" target="_blank" rel="noopener">日興</a> / <a href="https://www.rakuten-sec.co.jp/web/domestic/margin/rule/session.html" target="_blank" rel="noopener">楽天</a> / <a href="https://search.sbisec.co.jp/v2/popwin/help/trade_stock_14_01.html" target="_blank" rel="noopener">SBI</a> / <a href="https://kabu.com/item/shinyo/rule.html" target="_blank" rel="noopener">eスマート</a>。受付・処理状況で当日扱いにならない場合があるため、注文画面の約定日を確認すること。</li>
       <li>株価の「⚡ 自動取得」は、このSitesアプリのサーバーから Yahoo Finance の遅延データを取得するベストエフォート機能。取得可否・値の鮮度は保証されないため、<b>発注判断では必ず板・現在値を確認</b>すること。</li>
     </ul>
     <details class="history">
@@ -486,7 +489,7 @@ const DEFAULT_CONFIG = {
     //                     4社とも公式が両端入れを明記(2026-07-15確認)。'oneEnd' は受渡日の差のみ(参考用)
     countMethod: 'bothEnds',
     rounding: 'floor',      // 円未満の端数: 'floor' 切り捨て / 'round' 四捨五入 / 'ceil' 切り上げ
-    interestDays: 1,        // 信用買い→現引きの買方金利日数(受渡日ベース両端入れ: 当日現引き=1日、翌営業日現引き=2日)
+    interestDays: 1,        // 寄りの買方金利日数の手動補正(通常は当日現引き=1日)。大引けの追加日数は受渡日から自動計算。
     costRateGuide: 20       // コスト率の目安 %(これ以下なら「クロスする」の目安=緑、超えたら警告色)。クロス民の一般的な基準は優待価値の20%
   },
 
@@ -501,6 +504,7 @@ const DEFAULT_CONFIG = {
       '2026/01/05 日興: 一般(3年)貸株料 1.40%→1.70%、制度買方金利 2.50%→2.97%'
     ],
     tool: [
+      '2026/10/23 各社カードの合計直下に大引けの総額・寄りとの差を追加。各社の当日現引き締切と受渡日(土日祝・日興の金利改定を含む)で計算。寄りの合計・内訳・入力欄は維持',
       '2026-10-11: TOPIX区分と東証の上場状態を2列表示。市場区分・計画入り・監理・整理銘柄を東証公式資料から利用時に日次更新。',
       '2026/10/10 TOPIX初回定期入替(10/7公表・10/30実施)の区分を追加。コードまたは銘柄名の入力で、基準月2026/10と新規・移行・継続・構成外を表示',
       '2026/10/10 日興の制度買方金利を約定日で自動切替。2026/10/21約定までは3.54%、10/22約定分から3.69%を適用',
@@ -676,6 +680,15 @@ function mergeDeep(base, over) {
   }
   return base;
 }
+
+// 2026-10-23公式確認。出典・処理上の注意は manual/03-nikko.md〜06-esmart.md。
+// 東証の大引け15:30の約定後に、当日現引き(品受)の受付時間が残るか。
+const CLOSE_GENBIKI_RULES = {
+  nikko:   { sameDay: false, cutoff: '15:30' },
+  rakuten: { sameDay: true,  cutoff: '15:45' },
+  sbi:     { sameDay: true,  cutoff: '16:00' },
+  esmart:  { sameDay: true,  cutoff: '15:44' }
+};
 
 function buyInterestSegments(broker, executionDate, days, holidays) {
   const segments = [];
@@ -902,7 +915,7 @@ function adminFee(broker, tate, ochi, shares) {
   return { months, fee: roundYen(per * months) };
 }
 
-function calcBroker(key) {
+function calcBroker(key, timing = 'open') {
   const b = config.brokers[key];
   const set = holidaySet();
   const price = Number(inputState.price), shares = Number(inputState.shares);
@@ -968,6 +981,7 @@ function calcBroker(key) {
 
   const items = [];
   const warnings = [];
+  let interestDays = 0, genbikiDate = null, genbikiSettle = null;
 
   // --- 売り建て手数料 ---
   items.push({ label: '売り建て手数料(信用)', amount: b.marginFee, formula: b.marginFee === 0 ? (b.feeNote || '') : '' });
@@ -975,8 +989,13 @@ function calcBroker(key) {
   // --- 買い側 ---
   if (buyMethod === 'genbiki') {
     items.push({ label: '買い建て手数料(信用)', amount: b.marginFee, formula: b.marginFee === 0 ? (b.feeNote || '') : '' });
-    const idays = Number(config.calc.interestDays) || 1;
-    const interestSegments = buyInterestSegments(b, tate, idays, set);
+    const nextDayGenbiki = timing === 'closeDelayed' || (timing === 'close' && !CLOSE_GENBIKI_RULES[key].sameDay);
+    genbikiDate = nextDayGenbiki ? nextBizDay(tate, set) : tate;
+    genbikiSettle = addBizDays(genbikiDate, 2, set);
+    // 寄りの既存の手動補正を維持し、現引きが遅れる場合の受渡日の差だけを加える。
+    // 翌営業日現引きでも金利は常に2日ではない(水曜建て→木曜現引きは通常4日分)。
+    interestDays = (Number(config.calc.interestDays) || 1) + calDays(sellSettle, genbikiSettle);
+    const interestSegments = buyInterestSegments(b, tate, interestDays, set);
     const rateDays = interestSegments.reduce((sum, segment) => sum + segment.rate * segment.days, 0);
     const interest = roundYen(amount * rateDays / 100 / 365);
     const interestLabel = interestSegments.map(segment => segment.rate + '%').join('→');
@@ -1082,7 +1101,7 @@ function calcBroker(key) {
   }
 
   const total = items.reduce((s, it) => s + it.amount, 0);
-  return { key, name: b.name, courseNote: b.courseNote, items, total, warnings, judge, blocked, days, sellSettle, buybackSettle };
+  return { key, name: b.name, courseNote: b.courseNote, items, total, warnings, judge, blocked, days, sellSettle, buybackSettle, interestDays, genbikiDate, genbikiSettle };
 }
 
 /* ============================ 表示 ============================ */
@@ -1135,7 +1154,31 @@ function renderCards() {
           <td>${esc(it.label)}${it.formula ? `<span class="formula">${esc(it.formula)}</span>` : ''}</td>
           <td class="amt">${fmtYen(it.amount)}円</td>
         </tr>`).join('');
-      const warns = r.warnings.length ? `<div class="warnbox">${r.warnings.map(w => '<div>⚠ ' + esc(w) + '</div>').join('')}</div>` : '';
+      const close = calcBroker(key, 'close');
+      const difference = close.total - r.total;
+      const differenceText = difference === 0 ? '差額0円' : '寄りとの差 ' + (difference > 0 ? '＋' : '−') + fmtYen(Math.abs(difference)) + '円';
+      const comparisonWarnings = [];
+      if (key === 'esmart') comparisonWarnings.push('eスマート公式は優待クロスを寄付(後場寄り含む)までに発注するよう案内。大引け額は費用の参考値で、引けでのクロス発注可否は公式に確認。');
+      const isGenbiki = inputState.buyMethod[key] === 'genbiki';
+      const openingDays = Number(config.calc.interestDays) || 1;
+      const openingLabel = isGenbiki
+        ? (openingDays === 1 ? '寄り・当日現引き' : '寄り・現引き(金利' + openingDays + '日設定)')
+        : '寄り・現物買い';
+      if (isGenbiki) {
+        const rule = CLOSE_GENBIKI_RULES[key];
+        if (rule.sameDay) {
+          const delayed = calcBroker(key, 'closeDelayed');
+          comparisonWarnings.push('大引けは' + rule.cutoff + 'までに当日現引き' + (key === 'esmart' ? '(品受)' : '') + 'できた場合の試算。受付・処理状況で翌営業日扱いになる場合は' + fmtYen(delayed.total) + '円(金利' + delayed.interestDays + '日)。注文画面の約定日を確認。');
+          if (key === 'esmart') comparisonWarnings.push('品受は15:45から翌営業日扱いへ順次切替。切替直後は当日扱いが残る場合がある。');
+        } else {
+          comparisonWarnings.push('大引け後は当日現引き不可(' + rule.cutoff + '締切)。' + fmtJP(close.genbikiDate) + '現引き・受渡' + fmtJP(close.genbikiSettle) + 'まで金利' + close.interestDays + '日分。');
+        }
+        const last = prevBizDay(parseYMD(inputState.ochi), holidaySet());
+        if (close.genbikiDate > last) comparisonWarnings.push('大引け取得では今回の優待を取得できません(現引きが権利付最終日を過ぎます)。名義書換料等は別途。');
+        else if (rule.sameDay && nextBizDay(close.genbikiDate, holidaySet()) > last) comparisonWarnings.push('当日扱いに間に合わないと現引きが権利付最終日を過ぎ、今回の優待を取得できません。名義書換料等は別途。');
+      }
+      const allWarnings = [...r.warnings, ...comparisonWarnings];
+      const warns = allWarnings.length ? `<div class="warnbox">${allWarnings.map(w => '<div>⚠ ' + esc(w) + '</div>').join('')}</div>` : '';
       const judgeHtml = r.judge ? `<div class="judgebox">${r.judge.main}${r.judge.sub ? `<span class="sub">${esc(r.judge.sub)}</span>` : ''}</div>` : '';
       const blockedHtml = r.blocked ? `<div class="blockedbox">🚫 ${esc(r.blocked)}</div>` : '';
       // 利回り: 優待価値を入れた人にだけ「お得額(優待価値−コスト)」「コスト率(コスト÷優待価値)」を表示
@@ -1161,7 +1204,8 @@ function renderCards() {
       }
       body = `
         ${judgeHtml}${blockedHtml}
-        <div class="total"><span class="num">${fmtYen(r.total)}</span><span class="unit">円</span>${r.blocked ? '<span class="badge-blocked">建不可</span>' : ''}</div>
+        <div class="total"><span class="total-label">${esc(openingLabel)}</span><span class="num">${fmtYen(r.total)}</span><span class="unit">円</span>${r.blocked ? '<span class="badge-blocked">建不可</span>' : ''}</div>
+        <div class="close-comparison">大引けの場合：${fmtYen(close.total)}円（${differenceText}）</div>
         ${yieldHtml}
         <table class="breakdown">${rows}</table>
         ${warns}`;
@@ -1576,7 +1620,7 @@ const SETTING_FIELDS = [
     options: [['bothEnds', '両端入れ(4社標準: 受渡日の差+1日)'], ['oneEnd', '片端(受渡日の差のみ・参考)']] },
   { path: 'calc.rounding', label: '円未満の端数処理', type: 'select',
     options: [['floor', '切り捨て(多くの会社)'], ['round', '四捨五入'], ['ceil', '切り上げ']] },
-  { path: 'calc.interestDays', label: '現引きまでの買方金利日数(当日現引き=1、翌営業日=2)', unit: '日' },
+  { path: 'calc.interestDays', label: '寄りの買方金利日数(手動補正・通常1。大引けの追加日数は受渡日から自動計算)', unit: '日' },
   { path: 'calc.costRateGuide', label: 'コスト率の目安(これ以下なら緑=クロス推奨。クロス民の一般的な基準は20%)', unit: '%' },
   { section: 'SMBC日興証券' },
   { path: 'brokers.nikko.sell.general.rate', label: '一般信用(3年)貸株料', unit: '%' },

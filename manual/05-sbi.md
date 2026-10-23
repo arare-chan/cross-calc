@@ -52,6 +52,7 @@
 ## 現引き・現渡し
 
 - 手数料: **無料**。精算時に建単価×株数±諸経費で授受
+- **現引注文は0:00〜16:00までが当日扱い、16:00以降は翌営業日扱い**([公式HELP](https://search.sbisec.co.jp/v2/popwin/help/trade_stock_14_01.html))。大引け15:30約定後でも当日現引きできれば買方金利は1日分。一律に翌営業日扱いにしない。大引け後の処理・注文の停止状況で当日扱いに間に合わない場合があるため、注文画面の約定日を確認する。翌営業日現引きの場合の買方金利は新規建て受渡日〜現引き受渡日の暦日数・両端入れで計算する。
 - **現渡し注文は権利付最終日の16:00過ぎから**翌営業日(権利落ち日)分として発注可能(公式FAQ)
 
 ## 在庫開放・注文受付時間
@@ -113,8 +114,11 @@
 - [売建在庫不足時の失効・強制返済(ヘルプ)](https://search.sbisec.co.jp/v2/popwin/help/trade_stock_11_12.html)
 - [貸株「優待優先」設定(FAQ)](https://faq.sbisec.co.jp/answer/5eb2530b1149dd0011cbeb84/) / [継続保有優待×貸株の注意(FAQ)](https://faq.sbisec.co.jp/answer/5ee33bd3878c430011c18215/)
 - [S株 取引ルール](https://search.sbisec.co.jp/v2/popwin/attention/trading/stock_07.html)
+- [現引注文の注文可能時間・取消可能時間](https://search.sbisec.co.jp/v2/popwin/help/trade_stock_14_01.html)(当日扱い16:00まで。2026-10-23確認)
 - (補助)[在庫更新19時の実務情報](https://kabukichi3.com/archives/11694) / [在庫追加時間比較](https://kabu.96ut.com/article/hikaku/uritatetimehikaku/) / [ザイ・オンライン信用コスト比較](https://diamond.jp/zai/list/sec_hikakuhyo/shinyo) / [取引とり子の株はじめ — フライングクロスカレンダー](https://torihikitoriko.com/flying-cross-calendar/)(短期解禁日の実務カレンダー。ユーザーの常用ソース)
 
 - [本日の注意銘柄(国内株式信用)](https://search.sbisec.co.jp/v2/popwin/attention/stock/margin.html)(規制銘柄・17時頃更新) / [無期限売りとは](https://www.sbisec.co.jp/ETGate/WPLETmgR001Control?OutSide=on&getFlg=on&burl=search_domestic&cat1=domestic&cat2=margin&dir=margin&file=domestic_margin_daytrade_07.html)(18:30在庫不足判定→翌営業日強制返済)
 
 **要確認**: 制度信用貸株料(公式レート表で直接確認)、一般信用売りの配当落調整金率、日計り持ち越し玉の強制決済ルール、メンテナンス時間帯、優待銘柄の短期/無期限区分の現在の割当(銘柄ごとに一覧で確認)。
+
+*追加調査日: 2026-10-23。現引きの当日受付締切と公式の処理上の注意を確認。その他の調査日は本文冒頭を参照。*
