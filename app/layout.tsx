@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import "./globals.css";
 
-const title = "優待クロス 手数料シミュレーター";
+const title = "あられーたー";
 const description =
   "SMBC日興証券・楽天証券・SBI証券・三菱UFJ eスマート証券の優待クロスコストを比較できる計算機です。";
 const siteOrigin = new URL("https://yutai-cross-calculator.workspace-843878.chatgpt.site");
@@ -12,12 +12,22 @@ export const metadata: Metadata = {
   metadataBase: siteOrigin,
   title,
   description,
-  applicationName: "優待クロス計算機",
-  icons: { icon: "/favicon.svg" },
+  applicationName: title,
+  icons: {
+    icon: [
+      { url: "/favicon.ico?v=20261023-cat-market", sizes: "16x16 32x32 48x48" },
+      { url: "/favicon-32x32.png?v=20261023-cat-market", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-16x16.png?v=20261023-cat-market", sizes: "16x16", type: "image/png" },
+    ],
+    apple: { url: "/apple-touch-icon.png?v=20261023-cat-market", sizes: "180x180", type: "image/png" },
+  },
+  appleWebApp: { title },
+  manifest: "/site.webmanifest?v=20261023-cat-market",
   robots: { index: true, follow: true },
   openGraph: {
     type: "website",
     locale: "ja_JP",
+    siteName: title,
     url: siteOrigin,
     title,
     description,
