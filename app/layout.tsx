@@ -15,14 +15,14 @@ export const metadata: Metadata = {
   applicationName: title,
   icons: {
     icon: [
-      { url: "/favicon.ico?v=20261023", sizes: "16x16 32x32 48x48" },
-      { url: "/favicon-32x32.png?v=20261023", sizes: "32x32", type: "image/png" },
-      { url: "/favicon-16x16.png?v=20261023", sizes: "16x16", type: "image/png" },
+      { url: "/favicon.ico?v=20261023-cat-market", sizes: "16x16 32x32 48x48" },
+      { url: "/favicon-32x32.png?v=20261023-cat-market", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-16x16.png?v=20261023-cat-market", sizes: "16x16", type: "image/png" },
     ],
-    apple: { url: "/apple-touch-icon.png?v=20261023", sizes: "180x180", type: "image/png" },
+    apple: { url: "/apple-touch-icon.png?v=20261023-cat-market", sizes: "180x180", type: "image/png" },
   },
   appleWebApp: { title },
-  manifest: "/site.webmanifest?v=20261023",
+  manifest: "/site.webmanifest?v=20261023-cat-market",
   robots: { index: true, follow: true },
   openGraph: {
     type: "website",
