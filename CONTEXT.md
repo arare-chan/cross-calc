@@ -13,6 +13,7 @@
 - `app/api/listing-status/route.ts` は東証公式資料による市場区分・上場状態のAPI。利用時のみ更新し、取得結果を24時間再利用する。計画入りの表示定義は用語集、更新設計は `docs/adr/0002-on-demand-listing-status.md` を参照する。
 - `slides/yutai-cross-slides.html` はマニュアルの要点を伝える派生成果物。大きな数値変更は横断反映する。
 - `app/page.tsx` はSites版の入口。公開先はGitHub PagesではなくSitesとする。
+- サイト名は「あられーたー」。添付の猫画像由来の favicon と `public/apple-touch-icon.png` を使用し、`app/layout.tsx`・`public/calculator.html`・`public/site.webmanifest` の名前とアイコンを揃える（2026-10-23）。公開URLは従来のままとする。
 - 料率、手数料、受付時刻、制度ルールの最終的な情報源は各社・取引所・日証金の公式情報。マニュアル末尾の出典を確認する。
 
 ## 基本用語

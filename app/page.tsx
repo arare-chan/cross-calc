@@ -4,7 +4,7 @@ export default function Home() {
       <iframe
         className="calculator-frame"
         src="/calculator.html"
-        title="優待クロス 手数料シミュレーター"
+        title="あられーたー"
       />
     </main>
   );
